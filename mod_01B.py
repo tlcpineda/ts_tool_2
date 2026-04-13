@@ -18,11 +18,18 @@ csv_name = "translations.csv"  # The filename of the output CSV file
 
 
 def finalise_csv():
-    csv_data, csv_path = load_csv()
+    try:
+        csv_data, csv_path = load_csv()
 
-    updated_list = calc_coords(csv_data)
+        updated_list = calc_coords(csv_data)
 
-    write_to_csv(csv_path, updated_list)
+        write_to_csv(csv_path, updated_list)
+    except Exception as e:
+        display_message(
+            "ERROR",
+            f"Failed to calculate coordinates.  Verify file '{csv_name}'.",
+            f"{e}",
+        )
 
 
 def calc_coords(data) -> list:

@@ -20,6 +20,36 @@ csv_name = "translations.csv"  # The filename of the output CSV file
 textbox_dim_dst = [0.015, 0.01]  # width x height normalised.
 
 
+def create_pre_csv() -> None:
+    """
+    Create a CSV file with table/s of translation notes from DOCX file/s.
+    CSV file subject to manual processing for pagination and panel number designation.
+    mod_01B.py shall handle x0, y0 calculations based on page/panel number.
+    """
+
+    row_data, parent_folder = get_table_from_docx()
+
+    # Early return if no table is found in file.
+    if not row_data or parent_folder is None:
+        return
+
+    try:
+        csv_path = os.path.normpath(os.path.join(parent_folder, csv_name))
+
+        # Open (or create) the CSV file for writing.
+        with open(csv_path, "w", newline="", encoding="utf-8-sig") as csvfile:
+            csv.writer(csvfile).writerows(row_data)
+
+        display_message(
+            "SUCCESS",
+            f"Translations written to {csv_name}. Proceed to manual cleaning.",
+        )
+        display_path_desc(csv_path, "file")
+
+    except Exception as e:
+        display_message("ERROR", f"Error writing to CSV file {csv_name}.", f"{e}")
+
+
 def get_table_from_docx() -> tuple:
     print(">>> Select translation file/s (*.docx) to scrape ...")
 
@@ -84,36 +114,6 @@ def get_table_from_docx() -> tuple:
 
     # Extract, and return the tables found in the file.
     return row_data, parent_folder
-
-
-def create_pre_csv() -> None:
-    """
-    Create a CSV file with table/s of translation notes from DOCX file/s.
-    CSV file subject to manual processing for pagination and panel number designation.
-    mod_01B.py shall handle x0, y0 calculations based on page/panel number.
-    """
-
-    row_data, parent_folder = get_table_from_docx()
-
-    # Early return if no table is found in file.
-    if not row_data or parent_folder is None:
-        return
-
-    try:
-        csv_path = os.path.normpath(os.path.join(parent_folder, csv_name))
-
-        # Open (or create) the CSV file for writing.
-        with open(csv_path, "w", newline="", encoding="utf-8-sig") as csvfile:
-            csv.writer(csvfile).writerows(row_data)
-
-        display_message(
-            "SUCCESS",
-            f"Translations written to {csv_name}. Proceed to manual cleaning.",
-        )
-        display_path_desc(csv_path, "file")
-
-    except Exception as e:
-        display_message("ERROR", f"Error writing to CSV file {csv_name}.", f"{e}")
 
 
 if __name__ == "__main__":
