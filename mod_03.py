@@ -61,14 +61,15 @@ def compile_revision() -> None:
             with Image.open(source_file) as img:
                 base_filename = os.path.splitext(filename)[0]
                 rgb_img = img.convert("RGB")
+                jpeg_path = save_jpeg(rgb_img, jpeg_dir, base_filename)
 
-                # Store copy of image to memory, for PDF compilation.
-                for_pdf_pages.append(rgb_img.copy())
+                # Append path of saved JPEG file, file PDF compilation.
+                for_pdf_pages.append(jpeg_path)
 
-                save_jpeg(rgb_img, jpeg_dir, base_filename)
-                copy_psd(source_file, psd_dir, base_filename)
+            copy_psd(source_file, psd_dir, base_filename)
 
         if for_pdf_pages:
+            for_pdf_pages = [p for p in for_pdf_pages if p.strip()]
             compile_pdf_file(for_pdf_pages, pdf_name)
 
         return
@@ -79,7 +80,7 @@ def compile_revision() -> None:
         return
 
 
-def save_jpeg(rgb: Image.Image, dest_path: str, jpeg_name: str) -> None:
+def save_jpeg(rgb: Image.Image, dest_path: str, jpeg_name: str) -> str:
     jpeg_path = compile_dest_path(dest_path, jpeg_name, "jpg", "file")
 
     try:
@@ -89,8 +90,12 @@ def save_jpeg(rgb: Image.Image, dest_path: str, jpeg_name: str) -> None:
         display_message("SUCCESS", "JPEG file saved to revision folder.")
         display_path_desc(jpeg_path, "file")
 
+        return jpeg_path
+
     except Exception as e:
         display_message("ERROR", "Failed to save file.", f"{e}")
+
+        return ""
 
 
 def copy_psd(source_path: str, dest_path: str, psd_name: str) -> None:
@@ -114,11 +119,26 @@ def copy_psd(source_path: str, dest_path: str, psd_name: str) -> None:
         display_message("ERROR", "Failed to copy PSD file.", f"{e}")
 
 
-def compile_pdf_file(imgs: list, pdf_path: str) -> None:
+def compile_pdf_file(image_paths: list, pdf_path: str) -> None:
+    def img_generator(image_paths):
+        for path in image_paths:
+            with Image.open(path) as img:
+                yield img.convert("RGB")
+
     try:
-        imgs[0].save(
-            pdf_path, "PDF", resolution=jpeg_res, save_all=True, append_images=imgs[1:]
-        )
+        # Open the first image as the anchor.
+        with Image.open(image_paths[0]) as first_img:
+            base_img = first_img.convert("RGB")
+
+            # The 'append_images' parameter accepts the generator
+            base_img.save(
+                pdf_path,
+                "PDF",
+                resolution=jpeg_res,
+                save_all=True,
+                append_images=img_generator(image_paths[1:]),
+            )
+
         display_message("SUCCESS", "Revision PDF file created.")
         display_path_desc(pdf_path, "file")
 
@@ -138,11 +158,21 @@ def compile_dest_path(
 
 
 def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
+    def clean_number(num: str) -> tuple:
+        """
+        Strip leading/trailing zeroes from chapter numbers.
+        Main chapters (including extra chapters) are numbered with integers.
+        """
+
+        n = float(num)
+        is_int = n.is_integer()
+        return (int(n), is_int) if is_int else (n, is_int)
+
     psd_path = ""
     jpeg_path = ""
     pdf_path = ""
-    ch_num = parent_dir.split("-")[-1].strip()
-    current_num_rev_dir = count_rev_dirs(parent_dir) + 1
+    ch_num, is_main_ch = clean_number(basename.split("_")[-1].strip())
+    current_num_rev_dir = count_rev_dirs(parent_dir, is_main_ch)
 
     display_message(
         "INFO",
@@ -155,7 +185,7 @@ def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
         psd_path = compile_dest_path(parent_dir, current_rev_dir, "PSD", "folder")
         jpeg_path = compile_dest_path(parent_dir, current_rev_dir, "JPEG", "folder")
         pdf_path = compile_dest_path(
-            os.path.join(parent_dir, current_rev_dir), ch_num, "pdf", "file"
+            os.path.join(parent_dir, current_rev_dir), f"CH{ch_num}", "pdf", "file"
         )
 
         for path in [psd_path, jpeg_path, pdf_path]:
@@ -169,10 +199,22 @@ def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
     return psd_path, jpeg_path, pdf_path
 
 
-def count_rev_dirs(directory: str) -> int:
+def count_rev_dirs(directory: str, is_main: bool) -> str:
+    rev_num = ""
+
+    # List folders that starts with {compile_dir_base}.
     rev_dirs = [d for d in os.listdir(directory) if d.startswith(compile_dir_base)]
 
-    return len(rev_dirs)
+    # Return revision number based on filtered list for revisions either for main or sub chapters.
+    if is_main:
+        rev_dirs = [d for d in rev_dirs if "." not in d]
+        rev_num = str(len(rev_dirs) + 1)
+    else:
+        rev_dirs = [d for d in rev_dirs if "." in d]
+        ch_suffix = rev_dirs[0].split(".")[-1]
+        rev_num = f"{len(rev_dirs) + 1}.{ch_suffix}"
+
+    return rev_num
 
 
 def filter_files(source_path: str) -> list:
