@@ -21,9 +21,11 @@ def finalise_csv():
     try:
         csv_data, csv_path = load_csv()
 
-        updated_list = calc_coords(csv_data)
+        if csv_path:
+            updated_list = calc_coords(csv_data)
 
-        write_to_csv(csv_path, updated_list)
+            write_to_csv(csv_path, updated_list)
+
     except Exception as e:
         display_message(
             "ERROR",
@@ -104,7 +106,7 @@ def load_csv() -> tuple[list, str]:
     print(">>> Select preliminary CSV file ...")
 
     # Load the file/s; at least one DOCX file may contain the translations.
-    path = os.path.normpath(str(identify_path("csv")))
+    path = str(identify_path("csv"))
 
     if not path:
         print("\n<=> No file selected.")
@@ -116,7 +118,7 @@ def load_csv() -> tuple[list, str]:
     with open(path, "r", newline="", encoding="utf-8-sig") as csvfile:
         data = list(csv.reader(csvfile))
 
-        return data, path
+        return data, os.path.normpath(path)
 
 
 def write_to_csv(csv_path: str, data: list) -> None:

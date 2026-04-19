@@ -211,8 +211,7 @@ def count_rev_dirs(directory: str, is_main: bool) -> str:
         rev_num = str(len(rev_dirs) + 1)
     else:
         rev_dirs = [d for d in rev_dirs if "." in d]
-        ch_suffix = rev_dirs[0].split(".")[-1]
-        rev_num = f"{len(rev_dirs) + 1}.{ch_suffix}"
+        rev_num = f"{len(rev_dirs) + 1}.5"
 
     return rev_num
 
