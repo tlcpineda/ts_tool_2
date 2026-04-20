@@ -163,10 +163,32 @@ def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
         Strip leading/trailing zeroes from chapter numbers.
         Main chapters (including extra chapters) are numbered with integers.
         """
+        ch_num = 0
+        is_main_ch = False
 
-        n = float(num)
-        is_int = n.is_integer()
-        return (int(n), is_int) if is_int else (n, is_int)
+        try:
+            if num.startswith("EX"):  # Handle extra chapters; ie "EX01", "EX02".
+                ch_num = num.upper()
+                is_main_ch = True
+
+            else:  # Handle numeric chapters ("0068", "0068.5", etc)
+                n = float(num)
+
+                if n.is_integer():
+                    ch_num = int(n)
+                    is_main_ch = True
+                else:
+                    ch_num = n
+                    is_main_ch = False
+        except ValueError as v:
+            display_message(
+                "ERROR", f"Invalid chapter format, {num}.  Check folder name.", f"{v}"
+            )
+
+        except Exception as e:
+            display_message("ERROR", "Failed to extract chapter number.", f"{e}")
+
+        return ch_num, is_main_ch
 
     psd_path = ""
     jpeg_path = ""
@@ -176,16 +198,21 @@ def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
 
     display_message(
         "INFO",
-        f"Creating pathnames for {ch_num} (rev. {current_num_rev_dir}) ...",
+        f"Creating pathnames for chapter {ch_num} (rev. {current_num_rev_dir}) ...",
     )
 
     try:
         current_rev_dir = f"{compile_dir_base}{current_num_rev_dir}"
+        # pdf_name = f"CH{ch_num}"
+        # pdf_name = ch_num if ch_num.startswith("EX") else f"CH{ch_num}"
 
         psd_path = compile_dest_path(parent_dir, current_rev_dir, "PSD", "folder")
         jpeg_path = compile_dest_path(parent_dir, current_rev_dir, "JPEG", "folder")
         pdf_path = compile_dest_path(
-            os.path.join(parent_dir, current_rev_dir), f"CH{ch_num}", "pdf", "file"
+            os.path.join(parent_dir, current_rev_dir),
+            ch_num if ch_num.startswith("EX") else f"CH{ch_num}",
+            "pdf",
+            "file",
         )
 
         for path in [psd_path, jpeg_path, pdf_path]:
