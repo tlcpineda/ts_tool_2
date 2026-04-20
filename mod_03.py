@@ -60,7 +60,8 @@ def compile_revision() -> None:
             # Create matchng JPEG file.
             with Image.open(source_file) as img:
                 base_filename = os.path.splitext(filename)[0]
-                rgb_img = img.convert("RGB")
+                img_mode = "CMYK" if img.mode == "CMYK" else "RGB"
+                rgb_img = img.convert(img_mode)
                 jpeg_path = save_jpeg(rgb_img, jpeg_dir, base_filename)
 
                 # Append path of saved JPEG file, file PDF compilation.
@@ -120,15 +121,17 @@ def copy_psd(source_path: str, dest_path: str, psd_name: str) -> None:
 
 
 def compile_pdf_file(image_paths: list, pdf_path: str) -> None:
-    def img_generator(image_paths):
+    def img_generator(image_paths, image_mode):
         for path in image_paths:
             with Image.open(path) as img:
-                yield img.convert("RGB")
+                yield img.convert(image_mode)
 
     try:
         # Open the first image as the anchor.
         with Image.open(image_paths[0]) as first_img:
-            base_img = first_img.convert("RGB")
+            img_mode = "CMYK" if first_img.mode == "CMYK" else "RGB"
+
+            base_img = first_img.convert(img_mode)
 
             # The 'append_images' parameter accepts the generator
             base_img.save(
@@ -136,7 +139,9 @@ def compile_pdf_file(image_paths: list, pdf_path: str) -> None:
                 "PDF",
                 resolution=jpeg_res,
                 save_all=True,
-                append_images=img_generator(image_paths[1:]),
+                append_images=img_generator(image_paths[1:], img_mode),
+                optimize=True,
+                quality=50,
             )
 
         display_message("SUCCESS", "Revision PDF file created.")
@@ -158,7 +163,7 @@ def compile_dest_path(
 
 
 def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
-    def clean_number(num: str) -> tuple:
+    def clean_number(num: str) -> tuple[str, bool]:
         """
         Strip leading/trailing zeroes from chapter numbers.
         Main chapters (including extra chapters) are numbered with integers.
@@ -188,7 +193,7 @@ def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
         except Exception as e:
             display_message("ERROR", "Failed to extract chapter number.", f"{e}")
 
-        return ch_num, is_main_ch
+        return str(ch_num), is_main_ch
 
     psd_path = ""
     jpeg_path = ""
