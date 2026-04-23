@@ -3,6 +3,7 @@ import os
 from PIL import Image
 
 from lib import (
+    clean_number,
     continue_sequence,
     display_message,
     display_path_desc,
@@ -163,38 +164,6 @@ def compile_dest_path(
 
 
 def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
-    def clean_number(num: str) -> tuple[str, bool]:
-        """
-        Strip leading/trailing zeroes from chapter numbers.
-        Main chapters (including extra chapters) are numbered with integers.
-        """
-        ch_num = 0
-        is_main_ch = False
-
-        try:
-            if num.startswith("EX"):  # Handle extra chapters; ie "EX01", "EX02".
-                ch_num = num.upper()
-                is_main_ch = True
-
-            else:  # Handle numeric chapters ("0068", "0068.5", etc)
-                n = float(num)
-
-                if n.is_integer():
-                    ch_num = int(n)
-                    is_main_ch = True
-                else:
-                    ch_num = n
-                    is_main_ch = False
-        except ValueError as v:
-            display_message(
-                "ERROR", f"Invalid chapter format, {num}.  Check folder name.", f"{v}"
-            )
-
-        except Exception as e:
-            display_message("ERROR", "Failed to extract chapter number.", f"{e}")
-
-        return str(ch_num), is_main_ch
-
     psd_path = ""
     jpeg_path = ""
     pdf_path = ""

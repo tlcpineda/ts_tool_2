@@ -135,93 +135,133 @@ def display_message(tag: str, message: str, exception: str = "") -> None:
         print(f"<=>  {exception}")
 
 
-def process_pathname(
-    case_num: int, base_path: str, target: str = "", data: list = []
-) -> str:
-    psd_path = os.path.join(base_path, target)
+def clean_number(num: str) -> tuple[str, bool]:
+    """
+    Strip leading/trailing zeroes from chapter numbers.
+    Main chapters (including extra chapters) are numbered with integers.
+    """
+    ch_num = 0
+    is_main_ch = False
 
-    if not psd_path:
-        return ""
-
-    display_path_desc(psd_path, "folder")
-
-    for item in os.listdir(psd_path):
-        filename, ext = os.path.splitext(item)
-
-        display_message("PROCESSING", f"{item} ...")
-
-        if ext.lower() == ".psd":  # Process only PSD files
-            path0 = os.path.join(psd_path, item)
-
-            if os.path.isfile(path0):
-                match case_num:
-                    case 1:  # Initial case when appending page markers ("##X") to original file name.
-                        page_num = filename[-2:]
-
-                        if page_num.isdigit():
-                            new_filename = f"{filename} {page_num}X{ext}"
-                            path1 = os.path.join(psd_path, new_filename)
-
-                            if path0 == path1:
-                                display_message(
-                                    "SKIP", "File with the same target name exists."
-                                )
-                            else:
-                                rename_path(path0, path1, "file")
-                        else:
-                            display_message("SKIP", "Not a valid file path.")
-
-                    case 2:  # Case when marking files for revision, with "X"
-                        if " " in filename:
-                            filename0, page = filename.split(" ")
-
-                            if page.isdigit() and page in data:
-                                new_filename = f"{filename}X{ext}"
-                                path1 = os.path.join(psd_path, new_filename)
-
-                                if path0 == path1:
-                                    display_message("SKIP", "File already marked.")
-                                else:
-                                    rename_path(path0, path1, "file")
-                            else:
-                                display_message("SKIP", "No revisions required.")
-                        else:
-                            display_message("SKIP", "No page marker found.")
-
-                    case 3:  # Case when cleaning up files name, prior to submission, remove page markers ("##" or "##X")
-                        if " " in filename:
-                            filename0, page = filename.split(" ")
-
-                            new_filename = f"{filename0}{ext}"
-                            path1 = os.path.join(psd_path, new_filename)
-
-                            if path0 == path1:
-                                display_message(
-                                    "SKIP", "File with the same name exists."
-                                )
-                            else:
-                                rename_path(path0, path1, "file")
-                        else:
-                            display_message("SKIP", "No page marker found.")
-
-            else:
-                display_message("SKIP", "Not a valid file path.")
-        else:
-            display_message("SKIP", "Not a PSD file.")
-
-    return psd_path
-
-
-def rename_path(path_src: str, path_dst, pathtype: str) -> None:
-    base_src = os.path.basename(path_src)
-    base_dst = os.path.basename(path_dst)
     try:
-        os.rename(path_src, path_dst)
+        if num.upper().startswith("EX"):  # Handle extra chapters; ie "EX01", "EX02".
+            ch_num = num.upper()
+            is_main_ch = True
 
+        else:  # Handle numeric chapters ("0068", "0068.5", etc)
+            n = float(num)
+
+            if n.is_integer():
+                ch_num = int(n)
+                # Handle chapter numbers less than 10.
+                ch_num = f"{ch_num:02}" if len(str(ch_num)) < 2 else ch_num
+                is_main_ch = True
+            else:
+                ch_num = n
+                # Handle chapter numbers less than 10.
+                ch_num = f"{ch_num:04}" if len(str(ch_num)) < 4 else ch_num
+                is_main_ch = False
+
+    except ValueError as v:
         display_message(
-            "SUCCESS",
-            f"F{pathtype[1:]} renamed.\n<=>  From : {base_src}\n<=>  To   : {base_dst}",
+            "ERROR",
+            f"Invalid chapter format, {num}.  Check folder name.",
+            f"{v}",
         )
 
     except Exception as e:
-        display_message("ERROR", f"Failed to rename {pathtype}.", f"{e}")
+        display_message("ERROR", "Failed to extract chapter number.", f"{e}")
+
+    return str(ch_num), is_main_ch
+
+
+# def process_pathname(
+#     case_num: int, base_path: str, target: str = "", data: list = []
+# ) -> str:
+#     psd_path = os.path.join(base_path, target)
+
+#     if not psd_path:
+#         return ""
+
+#     display_path_desc(psd_path, "folder")
+
+#     for item in os.listdir(psd_path):
+#         filename, ext = os.path.splitext(item)
+
+#         display_message("PROCESSING", f"{item} ...")
+
+#         if ext.lower() == ".psd":  # Process only PSD files
+#             path0 = os.path.join(psd_path, item)
+
+#             if os.path.isfile(path0):
+#                 match case_num:
+#                     case 1:  # Initial case when appending page markers ("##X") to original file name.
+#                         page_num = filename[-2:]
+
+#                         if page_num.isdigit():
+#                             new_filename = f"{filename} {page_num}X{ext}"
+#                             path1 = os.path.join(psd_path, new_filename)
+
+#                             if path0 == path1:
+#                                 display_message(
+#                                     "SKIP", "File with the same target name exists."
+#                                 )
+#                             else:
+#                                 rename_path(path0, path1, "file")
+#                         else:
+#                             display_message("SKIP", "Not a valid file path.")
+
+#                     case 2:  # Case when marking files for revision, with "X"
+#                         if " " in filename:
+#                             filename0, page = filename.split(" ")
+
+#                             if page.isdigit() and page in data:
+#                                 new_filename = f"{filename}X{ext}"
+#                                 path1 = os.path.join(psd_path, new_filename)
+
+#                                 if path0 == path1:
+#                                     display_message("SKIP", "File already marked.")
+#                                 else:
+#                                     rename_path(path0, path1, "file")
+#                             else:
+#                                 display_message("SKIP", "No revisions required.")
+#                         else:
+#                             display_message("SKIP", "No page marker found.")
+
+#                     case 3:  # Case when cleaning up files name, prior to submission, remove page markers ("##" or "##X")
+#                         if " " in filename:
+#                             filename0, page = filename.split(" ")
+
+#                             new_filename = f"{filename0}{ext}"
+#                             path1 = os.path.join(psd_path, new_filename)
+
+#                             if path0 == path1:
+#                                 display_message(
+#                                     "SKIP", "File with the same name exists."
+#                                 )
+#                             else:
+#                                 rename_path(path0, path1, "file")
+#                         else:
+#                             display_message("SKIP", "No page marker found.")
+
+#             else:
+#                 display_message("SKIP", "Not a valid file path.")
+#         else:
+#             display_message("SKIP", "Not a PSD file.")
+
+#     return psd_path
+
+
+# def rename_path(path_src: str, path_dst, pathtype: str) -> None:
+#     base_src = os.path.basename(path_src)
+#     base_dst = os.path.basename(path_dst)
+#     try:
+#         os.rename(path_src, path_dst)
+
+#         display_message(
+#             "SUCCESS",
+#             f"F{pathtype[1:]} renamed.\n<=>  From : {base_src}\n<=>  To   : {base_dst}",
+#         )
+
+#     except Exception as e:
+#         display_message("ERROR", f"Failed to rename {pathtype}.", f"{e}")
