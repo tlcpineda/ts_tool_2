@@ -5,7 +5,7 @@ from lib import (
     continue_sequence,
     display_message,
     display_path_desc,
-    identify_path,
+    load_csv,
     welcome_sequence,
 )
 
@@ -98,27 +98,6 @@ def sort_rtl(page_data: list, rtl: bool) -> list:
 
     # Truncate x0, y0 to (at most) 6 decimal places.
     return list(map(lambda x: [x[0], f"{x[1]:g}", f"{x[2]:g}"] + x[3:], sorted_data))
-
-
-def load_csv() -> tuple[list, str]:
-    data = []
-
-    print(">>> Select preliminary CSV file ...")
-
-    # Load the file/s; at least one DOCX file may contain the translations.
-    path = str(identify_path("csv"))
-
-    if not path:
-        print("\n<=> No file selected.")
-        return data, ""
-
-    display_path_desc(path, "file")
-
-    # with open(path, mode="r", newline="", encoding="utf-8-sig") as csvfile:
-    with open(path, "r", newline="", encoding="utf-8-sig") as csvfile:
-        data = list(csv.reader(csvfile))
-
-        return data, os.path.normpath(path)
 
 
 def write_to_csv(csv_path: str, data: list) -> None:

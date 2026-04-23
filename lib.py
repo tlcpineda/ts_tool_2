@@ -1,3 +1,4 @@
+import csv
 import os
 import tkinter as tk
 from tkinter import filedialog as fd
@@ -175,6 +176,26 @@ def clean_number(num: str) -> tuple[str, bool]:
     return str(ch_num), is_main_ch
 
 
+def load_csv() -> tuple[list, str]:
+    data = []
+
+    print(">>> Select preliminary CSV file ...")
+
+    path = str(identify_path("csv"))
+    # path = identify_path("csv")
+
+    if not path:
+        print("\n<=> No file selected.")
+        return data, ""
+
+    display_path_desc(os.path.normpath(path), "file")
+
+    with open(path, "r", newline="", encoding="utf-8-sig") as csvfile:
+        data = list(csv.reader(csvfile))
+
+        return data, os.path.normpath(path)
+
+
 # def process_pathname(
 #     case_num: int, base_path: str, target: str = "", data: list = []
 # ) -> str:
@@ -252,16 +273,16 @@ def clean_number(num: str) -> tuple[str, bool]:
 #     return psd_path
 
 
-# def rename_path(path_src: str, path_dst, pathtype: str) -> None:
-#     base_src = os.path.basename(path_src)
-#     base_dst = os.path.basename(path_dst)
-#     try:
-#         os.rename(path_src, path_dst)
+def rename_path(path_src: str, path_dst, pathtype: str) -> None:
+    base_src = os.path.basename(path_src)
+    base_dst = os.path.basename(path_dst)
+    try:
+        os.rename(path_src, path_dst)
 
-#         display_message(
-#             "SUCCESS",
-#             f"F{pathtype[1:]} renamed.\n<=>  From : {base_src}\n<=>  To   : {base_dst}",
-#         )
+        display_message(
+            "SUCCESS",
+            f"F{pathtype[1:]} renamed.\n<=>  From : {base_src}\n<=>  To   : {base_dst}",
+        )
 
-#     except Exception as e:
-#         display_message("ERROR", f"Failed to rename {pathtype}.", f"{e}")
+    except Exception as e:
+        display_message("ERROR", f"Failed to rename {pathtype}.", f"{e}")
