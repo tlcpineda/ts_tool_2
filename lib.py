@@ -80,9 +80,9 @@ def ensure_path_exists(dirpath: str, base_type: str = "file") -> bool:
         display_message("INFO", "Path already exists.")
         display_path_desc(path_to_check, "folder")
         return True
+
     except Exception as err:
         display_message("ERROR", "Path could not be created", f"{err}")
-
         return False
 
 
@@ -201,84 +201,7 @@ def load_csv(inpath: str = "") -> tuple[list[list[str]], str]:
         return data, os.path.normpath(inpath)
 
 
-# def process_pathname(
-#     case_num: int, base_path: str, target: str = "", data: list = []
-# ) -> str:
-#     psd_path = os.path.join(base_path, target)
-
-#     if not psd_path:
-#         return ""
-
-#     display_path_desc(psd_path, "folder")
-
-#     for item in os.listdir(psd_path):
-#         filename, ext = os.path.splitext(item)
-
-#         display_message("PROCESSING", f"{item} ...")
-
-#         if ext.lower() == ".psd":  # Process only PSD files
-#             path0 = os.path.join(psd_path, item)
-
-#             if os.path.isfile(path0):
-#                 match case_num:
-#                     case 1:  # Initial case when appending page markers ("##X") to original file name.
-#                         page_num = filename[-2:]
-
-#                         if page_num.isdigit():
-#                             new_filename = f"{filename} {page_num}X{ext}"
-#                             path1 = os.path.join(psd_path, new_filename)
-
-#                             if path0 == path1:
-#                                 display_message(
-#                                     "SKIP", "File with the same target name exists."
-#                                 )
-#                             else:
-#                                 rename_path(path0, path1, "file")
-#                         else:
-#                             display_message("SKIP", "Not a valid file path.")
-
-#                     case 2:  # Case when marking files for revision, with "X"
-#                         if " " in filename:
-#                             filename0, page = filename.split(" ")
-
-#                             if page.isdigit() and page in data:
-#                                 new_filename = f"{filename}X{ext}"
-#                                 path1 = os.path.join(psd_path, new_filename)
-
-#                                 if path0 == path1:
-#                                     display_message("SKIP", "File already marked.")
-#                                 else:
-#                                     rename_path(path0, path1, "file")
-#                             else:
-#                                 display_message("SKIP", "No revisions required.")
-#                         else:
-#                             display_message("SKIP", "No page marker found.")
-
-#                     case 3:  # Case when cleaning up files name, prior to submission, remove page markers ("##" or "##X")
-#                         if " " in filename:
-#                             filename0, page = filename.split(" ")
-
-#                             new_filename = f"{filename0}{ext}"
-#                             path1 = os.path.join(psd_path, new_filename)
-
-#                             if path0 == path1:
-#                                 display_message(
-#                                     "SKIP", "File with the same name exists."
-#                                 )
-#                             else:
-#                                 rename_path(path0, path1, "file")
-#                         else:
-#                             display_message("SKIP", "No page marker found.")
-
-#             else:
-#                 display_message("SKIP", "Not a valid file path.")
-#         else:
-#             display_message("SKIP", "Not a PSD file.")
-
-#     return psd_path
-
-
-def rename_path(path_src: str, path_dst, pathtype: str) -> None:
+def rename_path(path_src: str, path_dst: str, pathtype: str) -> None:
     base_src = os.path.basename(path_src)
     base_dst = os.path.basename(path_dst)
     try:
@@ -286,7 +209,7 @@ def rename_path(path_src: str, path_dst, pathtype: str) -> None:
 
         display_message(
             "SUCCESS",
-            f"F{pathtype[1:]} renamed.\n<=>  From : {base_src}\n<=>  To   : {base_dst}",
+            f"{pathtype.title()} renamed.\n<=>  From : {base_src}\n<=>  To   : {base_dst}",
         )
 
     except Exception as e:
@@ -317,13 +240,14 @@ def expand_path(path_short: str) -> str:
 
 
 def copy_file(source_path: str, dest_path: str, filename: str, extname: str) -> None:
-    # Creates a copy of the PSD file (Manual Binary Copy) to revision folder.
-    file_path = parse_pathname(dest_path, filename, extname, "file")
+    # Creates a copy of the file (Manual Binary Copy) to revision folder.
+    file_path_0 = parse_pathname(source_path, filename, extname, "file")
+    file_path_1 = parse_pathname(dest_path, filename, extname, "file")
 
     try:
-        with open(source_path, "rb") as f_src:
-            with open(file_path, "wb") as f_dst:
-                # Copying in 1MB chunks to be safe with large PSD files
+        with open(file_path_0, "rb") as f_src:
+            with open(file_path_1, "wb") as f_dst:
+                # Copying in 1MB chunks to be safe with large files
                 while True:
                     chunk = f_src.read(1024 * 1024)
                     if not chunk:
@@ -331,7 +255,7 @@ def copy_file(source_path: str, dest_path: str, filename: str, extname: str) -> 
                     f_dst.write(chunk)
 
         display_message("SUCCESS", f"File copied to '{os.path.basename(dest_path)}'.")
-        display_path_desc(file_path, "file")
+        display_path_desc(file_path_1, "file")
 
     except Exception as e:
         display_message("ERROR", "Failed to copy file.", f"{e}")

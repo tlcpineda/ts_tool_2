@@ -1,13 +1,10 @@
-import csv
 import json
 import math
 import os
-import sys
 import tkinter as tk
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from PIL import Image
 
 from lib import (
     clean_number,
@@ -27,7 +24,7 @@ from lib import (
 )
 
 # Module variables
-mod_name = "Preliminary Works"
+mod_name = "Preliminary Administrative Works"
 mod_ver = "1"
 date = "23 Apr 2026"
 email = "tlcpineda.projects@gmail.com"
@@ -56,14 +53,10 @@ csv_heads = [
 ]
 
 # For table listing project cache data.
-heads = ["Work ID", "LIT ID", "Title (JP)", "Title (EN)"]
-col_widths = [7, 6, 20, 20]
+heads = ["Work ID", "LIT ID", "Title (EN)", "Title (JP)"]
+col_widths = [7, 6, 30, 30]
 
 cols = 8  # Currently eight (8) columns are set in pagination webpage.
-
-# PSD file properties
-psd_res = 600  # dpi
-psd_h = 2560  # px
 
 # Load .env file.
 load_dotenv()
@@ -133,9 +126,13 @@ class LogManager:
             return False
 
 
-def sort_files() -> None:
+def prepare_files() -> None:
+    ref_jpg_ch_folders = []
+    ref_psd_ch_folders = []
+    w_psd_ch_folders = []
+
     try:
-        display_message("INFO", "Sorting reference files ... ")
+        display_message("INFO", "Preparing reference files ... ")
 
         pagination_data, proj_name, vol_num, title_vol = gen_pagination()
         # List of reference PSD files.
@@ -143,65 +140,26 @@ def sort_files() -> None:
         # List of referene JPEG files.
         jpg_filenames = [f"{row[3]}.jpg" for row in pagination_data if row[6] == "—"]
 
-        # ### algo
-        # for row in pagination_data:
-        #     _, _, psd_name, jpeg_jp_name, ch_num, page_num, exclude_page, gtn = row
-
-        #     if exclude_page == "—":
-        #         psd_filenames.append(f"{psd_name}.psd")
-        #         jpg_filenames.append(f"{jpeg_jp_name}.jpg")
-
-        #         ch, is_main = clean_number(ch_num)
-        #         print(f"\nCH : {ch}\n")
-
-        #         ch_formatted = f"{'CH' if not ch.startswith('EX') else ''}{ch if is_main else ch.split('.')[0]}"
-
-        #         ch_float = 1000 if ch.startswith("EX") else float(ch)
-        #         ch_log = math.log(ch_float * (10 if ch_float < 10 else 1), 10)
-        #         lead_0 = (
-        #             ""
-        #             if ch.startswith("EX") or ch_log > 3
-        #             else "0" * (4 - math.floor(ch_log + 1))
-        #         )
-
-        #         print(f"{psd_name}.psd >>> {jpeg_jp_name}.jpeg : ")
-
-        #         print(f"\nParent directory : {PROJ_DIR}\\{proj_name}:")
-        #         print("    keep size and name")
-        #         print(f" 1. /{int(float(vol_num))}.1 PSD/{ch_formatted}")
-        #         print(f" 2. /{int(float(vol_num))}.2 JPEG/{ch_formatted}")
-
-        #         is_GTNP = gtn == "○"
-        #         gtn_marker = "GTN " if is_GTNP else ""
-        #         psd_filename = (
-        #             f"{gtn_marker}{title_vol}_{lead_0}{ch}_{int(page_num):03}"
-        #         )
-        #         print(f"\nWorking PSD files to be renamed as ' {psd_filename}.psd '.")
-        #         print(f"      resize to {psd_res}dpi; height {psd_h}px")
-        #         print(f"      is_GTNP : {is_GTNP}")
-        #         print(
-        #             f" 3. /V{int(vol_num):02} - {ch_formatted}/{title_vol}_{lead_0}{ch}"
-        #         )
-        #         print(
-        #             "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-        #         )
-        # ### end algo
-
         print("\n>>> Identify folders containing reference files ...")
 
-        jpeg_jp_dir, jpeg_num_missing = verify_contents_ref_folder(
-            jpg_filenames, "Japanese JPEG files"
-        )
         psd_files_dir, psd_num_missing = verify_contents_ref_folder(
             psd_filenames, "Typesetting files (PSD)"
         )
+        jpeg_jp_dir, jpeg_num_missing = verify_contents_ref_folder(
+            jpg_filenames, "Japanese JPEG files"
+        )
 
         # Proceed with sorting process only if both sets of files are complete.
-        if jpeg_num_missing or psd_num_missing:
+        if psd_num_missing or jpeg_num_missing:
             display_message("WARN", "Incomplete reference files.")
-            col_len = max(len(str(num)) for num in [jpeg_num_missing, psd_num_missing])
-            print(f"<=>   Number of missing JPEG files : {jpeg_num_missing:>{col_len}}")
-            print(f"<=>   Number of missing PSD files  : {psd_num_missing:>{col_len}}")
+            nums_list = [("PSD", psd_num_missing), ("JPEG", jpeg_num_missing)]
+            col_len = max(len(str(value)) for (_, value) in nums_list)
+            for name, value in nums_list:
+                print(
+                    f"<=>   Number of missing {name:4} files : {'No folder selected.' if value == 'NA' else value:>{col_len}}"
+                )
+
+            display_message("INFO", "Terminating process.")
             return
 
         # Sorting files.
@@ -217,106 +175,92 @@ def sort_files() -> None:
             proj_parent, f"{int(float(vol_num))}.2 JPEG", "", "folder"
         )
 
-        for row in pagination_data:
+        for row in pagination_data[2:]:  # Two rows of headers: JP, and EN.
             _, _, psd_name, jpeg_jp_name, ch_num, page_num, exclude_page, gtn = row
+
+            print("")
+            hor_bar(100, f"Processing '{psd_name}.psd' / '{jpeg_jp_name}.jpg' ...")
 
             if exclude_page == "—":  # "—" > False; ie row describes a working file.
                 # Save a copy of the pair of files to reference directories.
                 ch_name, ch_4 = parse_ch_name(ch_num)
                 psd_dest = parse_pathname(ref_psd_parent, ch_name, "", "folder")
                 jpg_dest = parse_pathname(ref_jpg_parent, ch_name, "", "folder")
-                ensure_path_exists(psd_dest, "folder")
-                ensure_path_exists(jpg_dest, "folder")
+
+                if psd_dest not in ref_psd_ch_folders:
+                    ensure_path_exists(psd_dest, "folder")
+                    ref_psd_ch_folders.append(psd_dest)
+
                 copy_file(psd_files_dir, psd_dest, psd_name, "psd")
+
+                if jpg_dest not in ref_jpg_ch_folders:
+                    ensure_path_exists(jpg_dest, "folder")
+                    ref_jpg_ch_folders.append(jpg_dest)
+
                 copy_file(jpeg_jp_dir, jpg_dest, jpeg_jp_name, "jpg")
 
-                # Resize PSD (600 dpi, 2560px H, proportional W), then save to working folder.
+                # Save a copy of the PSD file, then renamed, in the working folder.
                 psd_dest_w = parse_pathname(
                     proj_parent,
                     f"V{int(vol_num):02} - {ch_name}",
                     f"{title_vol}_{ch_4}",
                     "folder",
                 )
-                ensure_path_exists(psd_dest_w, "folder")
+
+                if psd_dest_w not in w_psd_ch_folders:
+                    ensure_path_exists(psd_dest_w, "folder")
+                    w_psd_ch_folders.append(psd_dest_w)
+
                 psd_name_w = f"{'GTNP' if gtn == '○' else ''}{title_vol}_{ch_4}_{int(page_num):03}"
-                resize_psd(psd_files_dir, psd_name, psd_dest_w, psd_name_w)
+
+                copy_file(psd_files_dir, psd_dest_w, psd_name, "psd")
+                rename_path(
+                    parse_pathname(psd_dest_w, psd_name, "psd", "file"),
+                    parse_pathname(psd_dest_w, psd_name_w, "psd", "file"),
+                    "file",
+                )
+
+            else:
+                display_message("INFO", "Skipping file.  Excluded from delivery list.")
+            hor_bar(100)
+
+        # Manually delete the base folders when opportune.
+        display_message(
+            "INFO", "Folders containing reference files may now be deleted."
+        )
+        display_path_desc(jpeg_jp_dir, "folder")
+        display_path_desc(psd_files_dir, "folder")
+
+        # Summarising contents of recently created folders.
+        summary_table = []
+
+        for index, folder in enumerate(
+            ref_psd_ch_folders + ref_jpg_ch_folders + w_psd_ch_folders
+        ):
+            summary_table.append(
+                [
+                    index + 1,
+                    f".../{'/'.join((folder.split('/' if '/' in folder else os.sep))[-2:])}",
+                    f"{len(os.listdir(folder)):6}",
+                    "※"
+                    if index > len(ref_psd_ch_folders + ref_jpg_ch_folders) - 1
+                    else "",
+                ]
+            )
+
+        show_table(
+            f"New Folders in .../2 PROJECTS/{proj_name}",
+            [4, 50, 10, 1],
+            ["Item", "Directory", "Contents", ""],
+            summary_table,
+        )
+
+        print("※ Files require adjustments in resolution and dimensions.")
 
     except Exception as e:
         display_message(
             "ERROR", "Failed to sort reference files to working directories.", f"{e}"
         )
-
-
-def resize_psd(src_dir, name_0, dest_dir, name_1) -> None:
-    psd_src = parse_pathname(src_dir, name_0, "psd", "file")
-    psd_dest = parse_pathname(dest_dir, name_1, "psd", "file")
-
-    try:
-        display_message("INFO", f"Processing file : {name_0}.psd ... ")
-
-        with Image.open(psd_src) as img:
-            # File resolution check.
-            file_res_0 = img.info.get("dpi", (72, 72))[0]
-            resampling_tech = Image.Resampling.LANCZOS
-
-            # Reassign resampling technique with user preferrence or default value.
-            if file_res_0 < psd_res:
-                display_message(
-                    "WARN",
-                    f"Current file resolution ({file_res_0}) less than required ({psd_res}).",
-                )
-                resampling_tech = get_pref_tech()
-
-            aspect_ratio = img.width / img.height
-            width_1 = int(aspect_ratio * psd_h)
-
-            # Resize and save image to destination directory.
-            img_to_dest = img.resize((width_1, psd_h), resampling_tech)
-            img_to_dest.save(
-                psd_dest,
-                dpi=(psd_res, psd_res),
-                icc_profile=img.info.get("icc_profile"),
-            )
-
-        display_message("SUCCESS", "File resized and renamed.")
-        display_path_desc(psd_dest, "file")
-
-    except Exception as e:
-        display_message("ERROR", f"Failed to process PSD file {name_0}.", f"{e}")
-
-
-def get_pref_tech() -> Image.Resampling:
-    RESAMPLING_OPTIONS = [
-        ("NEAREST", Image.Resampling.NEAREST),
-        ("LANCZOS", Image.Resampling.LANCZOS),
-        ("BILINEAR", Image.Resampling.BILINEAR),
-        ("BICUBIC", Image.Resampling.BICUBIC),
-        ("BOX", Image.Resampling.BOX),
-        ("HAMMING", Image.Resampling.HAMMING),
-    ]
-    tech_def = Image.Resampling.BICUBIC
-
-    show_table(
-        "Resampling Options",
-        [3, 8],
-        ["Index", "Name"],
-        [[ind, name] for ind, (name, _) in enumerate(RESAMPLING_OPTIONS)],
-    )
-
-    while True:
-        user_pref = input(
-            f"\n>>> Select preferred technique. Default '{str(tech_def).split('.')[-1]}' : "
-        ).strip()
-
-        if user_pref == "":
-            return tech_def  # Default value; no user input.
-
-        if user_pref in list(range(len(RESAMPLING_OPTIONS))):
-            return RESAMPLING_OPTIONS[int(user_pref)][1]
-        else:
-            display_message(
-                "WARN", "Invalid option. Select an index from '0' up to '5' only."
-            )
 
 
 def parse_ch_name(chapter_num: str) -> tuple[str, str]:
@@ -335,17 +279,21 @@ def parse_ch_name(chapter_num: str) -> tuple[str, str]:
 
 
 def verify_contents_ref_folder(
-    filenames: list[str], files_descriptor: str
-) -> tuple[str, int]:
-    print(f"\n>>>  {files_descriptor} : ")
+    fnames: list[str], files_desc: str
+) -> tuple[str, int | str]:
+    print(f"\n>>> {files_desc} : ")
 
     ref_folder = str(identify_path("folder"))
+
+    if not ref_folder:
+        print("\n>>> No folder selected.")
+        return "", "NA"
 
     _, base = display_path_desc(ref_folder, "folder")
     display_message("INFO", f"Verifying contents of folder '{base}' ...")
 
     ref_contents = os.listdir(ref_folder)
-    missing_files = [name for name in filenames if name not in ref_contents]
+    missing_files = [name for name in fnames if name not in ref_contents]
     num_missing_files = 0
 
     if missing_files:
@@ -364,7 +312,7 @@ def gen_pagination() -> tuple[list[list[str]], str, str, str]:
 
         table_title = "PROJECT CACHE DATA"
         table = [
-            [row["work_id"], row["lit_id"], row["title_jp"], row["title_en"]]
+            [row["work_id"], row["lit_id"], row["title_en"], row["title_jp"]]
             for row in cache.load()
         ]
 
@@ -440,27 +388,31 @@ def get_proj_details():
 
 
 def show_table(main_head: str, col_width: list, heads: list, table: list) -> None:
-    line_width = 3 + sum(col_width) + len(col_width) * 3 + 2
+    line_width = max(
+        3 + sum(col_width) + len(col_width) * 3 + 2, len(main_head) + 2 * (2 + 5)
+    )
 
     print("")
 
-    hor_bar(line_width, main_head)
+    hor_bar(line_width, main_head.upper())
 
     print("")
 
     for index, row in enumerate([heads] + table):
-        line = "<=> |"
+        line = "<=>  "
 
         for jndex, item in enumerate(row):
             col_len = col_width[jndex]
 
+            terminal_bar = " " if jndex == len(row) - 1 else "|"
+
             if index == 0:
-                line += f" {item:^{col_len}} |"
+                line += f" {item:^{col_len}} {terminal_bar}"
             else:
                 if jndex == 0 or jndex == 1:
-                    line += f" {item:>{col_len}} |"
+                    line += f" {item:>{col_len}} {terminal_bar}"
                 else:
-                    line += f" {item if len(item) <= col_len else f'{item[: col_len - 3]}...':<{col_len}} |"
+                    line += f" {item if len(item) <= col_len else f'{item[: col_len - 3]}...':<{col_len}} {terminal_bar}"
 
         print(line)
 
@@ -599,6 +551,5 @@ if __name__ == "__main__":
     confirm_exit = False
 
     while not confirm_exit:
-        # gen_pagination()
-        sort_files()
+        prepare_files()
         confirm_exit = continue_sequence()
