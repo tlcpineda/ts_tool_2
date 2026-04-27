@@ -5,10 +5,12 @@ from PIL import Image
 from lib import (
     clean_number,
     continue_sequence,
+    copy_file,
     display_message,
     display_path_desc,
     ensure_path_exists,
     identify_path,
+    parse_pathname,
     welcome_sequence,
 )
 
@@ -68,7 +70,7 @@ def compile_revision() -> None:
                 # Append path of saved JPEG file, file PDF compilation.
                 for_pdf_pages.append(jpeg_path)
 
-            copy_psd(source_file, psd_dir, base_filename)
+            copy_file(source_file, psd_dir, base_filename, "psd")
 
         if for_pdf_pages:
             for_pdf_pages = [p for p in for_pdf_pages if p.strip()]
@@ -83,7 +85,7 @@ def compile_revision() -> None:
 
 
 def save_jpeg(rgb: Image.Image, dest_path: str, jpeg_name: str) -> str:
-    jpeg_path = compile_dest_path(dest_path, jpeg_name, "jpg", "file")
+    jpeg_path = parse_pathname(dest_path, jpeg_name, "jpg", "file")
 
     try:
         # Save JPEG to local directory.
@@ -98,27 +100,6 @@ def save_jpeg(rgb: Image.Image, dest_path: str, jpeg_name: str) -> str:
         display_message("ERROR", "Failed to save file.", f"{e}")
 
         return ""
-
-
-def copy_psd(source_path: str, dest_path: str, psd_name: str) -> None:
-    # Creates a copy of the PSD file (Manual Binary Copy) to revision folder.
-    psd_path = compile_dest_path(dest_path, psd_name, "psd", "file")
-
-    try:
-        with open(source_path, "rb") as f_src:
-            with open(psd_path, "wb") as f_dst:
-                # Copying in 1MB chunks to be safe with large PSD files
-                while True:
-                    chunk = f_src.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    f_dst.write(chunk)
-
-        display_message("SUCCESS", "PSD file copied to revision folder.")
-        display_path_desc(psd_path, "file")
-
-    except Exception as e:
-        display_message("ERROR", "Failed to copy PSD file.", f"{e}")
 
 
 def compile_pdf_file(image_paths: list, pdf_path: str) -> None:
@@ -152,17 +133,6 @@ def compile_pdf_file(image_paths: list, pdf_path: str) -> None:
         display_message("ERROR", "Failed to compile revision PDF file.", f"{e}")
 
 
-def compile_dest_path(
-    parent_dir: str, basename: str, extname: str, pathtype: str
-) -> str:
-    if pathtype == "file":
-        dest_path = os.path.join(parent_dir, f"{basename}.{extname}")
-    else:  # folder
-        dest_path = os.path.join(parent_dir, f"{basename}/{extname}")
-
-    return os.path.normpath(dest_path)
-
-
 def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
     psd_path = ""
     jpeg_path = ""
@@ -177,12 +147,10 @@ def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
 
     try:
         current_rev_dir = f"{compile_dir_base}{current_num_rev_dir}"
-        # pdf_name = f"CH{ch_num}"
-        # pdf_name = ch_num if ch_num.startswith("EX") else f"CH{ch_num}"
 
-        psd_path = compile_dest_path(parent_dir, current_rev_dir, "PSD", "folder")
-        jpeg_path = compile_dest_path(parent_dir, current_rev_dir, "JPEG", "folder")
-        pdf_path = compile_dest_path(
+        psd_path = parse_pathname(parent_dir, current_rev_dir, "PSD", "folder")
+        jpeg_path = parse_pathname(parent_dir, current_rev_dir, "JPEG", "folder")
+        pdf_path = parse_pathname(
             os.path.join(parent_dir, current_rev_dir),
             ch_num if ch_num.startswith("EX") else f"CH{ch_num}",
             "pdf",

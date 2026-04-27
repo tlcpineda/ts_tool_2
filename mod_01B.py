@@ -1,12 +1,11 @@
 import csv
-import os
 
 from lib import (
     continue_sequence,
     display_message,
-    display_path_desc,
     load_csv,
     welcome_sequence,
+    write_to_csv,
 )
 
 # Module variables
@@ -98,26 +97,6 @@ def sort_rtl(page_data: list, rtl: bool) -> list:
 
     # Truncate x0, y0 to (at most) 6 decimal places.
     return list(map(lambda x: [x[0], f"{x[1]:g}", f"{x[2]:g}"] + x[3:], sorted_data))
-
-
-def write_to_csv(csv_path: str, data: list) -> None:
-    """
-    Save updated coordinates of each translation to the CSV file;
-    effectively overwriting the file produced in mod_01A.py.
-    :param csv_path: The path pointing to the CSV file.
-    :param data: A 2D array containing the comments in each page, with header row.
-    :return: None
-    """
-    try:
-        with open(csv_path, "w", newline="", encoding="utf-8") as file:
-            csv.writer(file).writerows(data)
-
-        display_message("SUCCESS", f"{len(data) - 1} comments written to {csv_name}.")
-
-        display_path_desc(csv_path, "file")
-
-    except Exception as e:
-        display_message("ERROR", f"Error writing to CSV file {csv_name}.", f"{e}")
 
 
 if __name__ == "__main__":

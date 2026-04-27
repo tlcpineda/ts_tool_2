@@ -30,16 +30,17 @@ def hor_bar(num_chars: int, text: str = "") -> None:
     print(display_x)
 
 
-def identify_path(base_type: str, initdir: str = "") -> str | tuple:
+def identify_path(base_type: str, initdir: str = "") -> str | tuple[str, ...]:
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True)
 
     path = ""
+    paths = ()
 
     match base_type:
         case "file":
-            path = fd.askopenfilenames(
+            paths = fd.askopenfilenames(
                 title="Select DOCX Files",
                 filetypes=(("DOCX files", "*.docx"), ("All files", "*.*")),
                 initialdir=initdir,
@@ -54,7 +55,7 @@ def identify_path(base_type: str, initdir: str = "") -> str | tuple:
             path = fd.askdirectory(title="Select Folder", initialdir=initdir)
 
     root.destroy()
-    return path
+    return paths if base_type == "file" else path
 
 
 def ensure_path_exists(dirpath: str, base_type: str = "file") -> bool:
@@ -85,9 +86,9 @@ def ensure_path_exists(dirpath: str, base_type: str = "file") -> bool:
         return False
 
 
-def display_path_desc(filepath: str, base_type: str) -> tuple:
-    parent_name, base_name = os.path.split(filepath)
-    split_parent_name = parent_name.split(os.sep)
+def display_path_desc(path: str, base_type: str) -> tuple[str, str]:
+    parent_name, base_name = os.path.split(path)
+    split_parent_name = parent_name.split("/" if "/" in parent_name else os.sep)
     num_levels = 3
     process_dirname = (
         parent_name
@@ -145,8 +146,10 @@ def clean_number(num: str) -> tuple[str, bool]:
     is_main_ch = False
 
     try:
-        if num.upper().startswith("EX"):  # Handle extra chapters; ie "EX01", "EX02".
-            ch_num = num.upper()
+        num_caps = num.upper()
+
+        if num_caps.startswith("EX"):  # Handle extra chapters; ie "EX01", "EX02".
+            ch_num = num_caps
             is_main_ch = True
 
         else:  # Handle numeric chapters ("0068", "0068.5", etc)
@@ -154,12 +157,12 @@ def clean_number(num: str) -> tuple[str, bool]:
 
             if n.is_integer():
                 ch_num = int(n)
-                # Handle chapter numbers less than 10.
+                # Handle chapter numbers less than 10; to display as "0#".
                 ch_num = f"{ch_num:02}" if len(str(ch_num)) < 2 else ch_num
                 is_main_ch = True
             else:
                 ch_num = n
-                # Handle chapter numbers less than 10.
+                # Handle chapter numbers less than 10; to display as "0#.#".
                 ch_num = f"{ch_num:04}" if len(str(ch_num)) < 4 else ch_num
                 is_main_ch = False
 
@@ -176,24 +179,26 @@ def clean_number(num: str) -> tuple[str, bool]:
     return str(ch_num), is_main_ch
 
 
-def load_csv() -> tuple[list, str]:
+def load_csv(inpath: str = "") -> tuple[list[list[str]], str]:
     data = []
 
-    print(">>> Select preliminary CSV file ...")
+    if not inpath:
+        print(">>> Select preliminary CSV file ...")
 
-    path = str(identify_path("csv"))
-    # path = identify_path("csv")
+        path = str(identify_path("csv"))
 
-    if not path:
-        print("\n<=> No file selected.")
-        return data, ""
+        if not path:
+            print("\n<=> No file selected.")
+            return data, ""
 
-    display_path_desc(os.path.normpath(path), "file")
+        inpath = path
 
-    with open(path, "r", newline="", encoding="utf-8-sig") as csvfile:
+    display_path_desc(os.path.normpath(inpath), "file")
+
+    with open(inpath, "r", newline="", encoding="utf-8-sig") as csvfile:
         data = list(csv.reader(csvfile))
 
-        return data, os.path.normpath(path)
+        return data, os.path.normpath(inpath)
 
 
 # def process_pathname(
@@ -286,3 +291,56 @@ def rename_path(path_src: str, path_dst, pathtype: str) -> None:
 
     except Exception as e:
         display_message("ERROR", f"Failed to rename {pathtype}.", f"{e}")
+
+
+def write_to_csv(csv_path: str, data: list) -> None:
+    """
+    Save data to the specified path.
+    :param csv_path: The path pointing to the CSV file.
+    :param data: A 2D list, with header row/s.
+    :return: None
+    """
+    try:
+        with open(csv_path, "w", newline="", encoding="utf-8") as file:
+            csv.writer(file).writerows(data)
+
+        display_message("SUCCESS", f"{len(data) - 1} data rows written to file.")
+
+        display_path_desc(csv_path, "file")
+
+    except Exception as e:
+        display_message("ERROR", "Writing to CSV file failed.", f"{e}")
+
+
+def expand_path(path_short: str) -> str:
+    return os.path.normpath(os.path.expanduser(path_short))
+
+
+def copy_file(source_path: str, dest_path: str, filename: str, extname: str) -> None:
+    # Creates a copy of the PSD file (Manual Binary Copy) to revision folder.
+    file_path = parse_pathname(dest_path, filename, extname, "file")
+
+    try:
+        with open(source_path, "rb") as f_src:
+            with open(file_path, "wb") as f_dst:
+                # Copying in 1MB chunks to be safe with large PSD files
+                while True:
+                    chunk = f_src.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    f_dst.write(chunk)
+
+        display_message("SUCCESS", f"File copied to '{os.path.basename(dest_path)}'.")
+        display_path_desc(file_path, "file")
+
+    except Exception as e:
+        display_message("ERROR", "Failed to copy file.", f"{e}")
+
+
+def parse_pathname(parent_dir: str, basename: str, extname: str, pathtype: str) -> str:
+    if pathtype == "file":
+        dest_path = os.path.join(parent_dir, f"{basename}.{extname}")
+    else:  # folder
+        dest_path = os.path.join(parent_dir, f"{basename}/{extname}")
+
+    return os.path.normpath(dest_path)
