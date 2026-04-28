@@ -1,5 +1,3 @@
-import csv
-
 from lib import (
     continue_sequence,
     display_message,
