@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 from lib import (
     clean_number,
-    continue_sequence,
     copy_file,
     display_message,
     display_path_desc,
@@ -25,8 +24,8 @@ from lib import (
 
 # Module variables
 mod_name = "Preliminary Administrative Works"
-mod_ver = "1"
-date = "23 Apr 2026"
+mod_ver = "2"
+date = "28 Apr 2026"
 email = "tlcpineda.projects@gmail.com"
 csv_name_pre = "numbering_tbl"
 csv_heads = [
@@ -204,7 +203,8 @@ def prepare_files() -> None:
                 # Save a copy of the PSD file, then renamed, in the working folder.
                 psd_dest_w = parse_pathname(
                     proj_parent,
-                    f"V{int(vol_num):02} - {ch_name}",
+                    # f"V{int(vol_num):02} - {ch_name}",
+                    f"Initialise Files/V{int(vol_num):02} - {ch_name}",
                     f"{title_vol}_{ch_4}",
                     "folder",
                 )
@@ -472,6 +472,9 @@ def get_webapp_data(id: str, vol: str, title_vol: str) -> list[list[str,]]:
     print(f"\n<=> Copy data, filtered for volume (巻数) {vol}, on : ")
     print(f"\n    {SRC_WEBAPP}/{id}?tab=list")
 
+    # Short pause to copy data.
+    print(input("\n>>> Press enter to continue ..."))
+
     try:
         # Define tkinter widget to receive data; where copied data shall be pasted to.
         root = tk.Tk()
@@ -576,15 +579,17 @@ def pre_lang():
         print("")
         hor_bar(100, f"Processing '{filename}' ({index + 1} of {len(file_list)})...")
 
-        if not filename.split(".")[-1].upper() == "PSD":
+        base, ext = os.path.splitext(filename)
+
+        if not ext.upper() == ".PSD":
             display_message("WARN", f"Skip '{filename}'.")
             continue
 
         # Copy file to new directory, then rename; filename includes extension name.
-        copy_file(dirpath_0, dirpath_1, filename, "")
+        copy_file(dirpath_0, dirpath_1, base, "psd")
 
-        filepath_0 = parse_pathname(dirpath_1, filename, "", "file")
-        filepath_1 = parse_pathname(dirpath_1, f"{lang_iso_2}_{filename}", "", "file")
+        filepath_0 = parse_pathname(dirpath_1, base, "psd", "file")
+        filepath_1 = parse_pathname(dirpath_1, f"{lang_iso_2}_{base}", "psd", "file")
         rename_path(filepath_0, filepath_1, "file")
 
         print("")

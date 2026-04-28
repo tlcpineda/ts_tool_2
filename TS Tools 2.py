@@ -10,8 +10,8 @@ from mod_03 import compile_revision
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "3.00.00"
-date = "28 Apr 2026"
+app_ver = "3.01.00"
+date = "29 Apr 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
     {

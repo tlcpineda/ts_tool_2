@@ -17,8 +17,8 @@ from lib import (
 
 # Module variables
 mod_name = "Compile Revision Files"
-mod_ver = "1"
-date = "13 Apr 2026"
+mod_ver = "2"
+date = "28 Apr 2026"
 email = "tlcpineda.projects@gmail.com"
 compile_dir_base = "COMPILED-JPG TO PDF"
 jpeg_res = 72  # dpi

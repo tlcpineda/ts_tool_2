@@ -263,11 +263,8 @@ def copy_file(source_dir: str, dest_dir: str, filename: str, extname: str) -> No
 
 def parse_pathname(parent_dir: str, basename: str, extname: str, pathtype: str) -> str:
     if pathtype == "file":
-        # dest_path = os.path.join(parent_dir, f"{basename}.{extname}")
-        dest_path = os.path.join(
-            parent_dir, f"{basename}{'' if '.' in basename else f'.{extname}'}"
-        )
+        dest_path = os.path.join(parent_dir, f"{basename}.{extname}")
     else:  # folder
-        dest_path = os.path.join(parent_dir, f"{basename}/{extname}")
+        dest_path = os.path.join(parent_dir, basename, extname)
 
     return os.path.normpath(dest_path)
