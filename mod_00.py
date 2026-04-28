@@ -52,11 +52,13 @@ csv_heads = [
     ],
 ]
 
-# For table listing project cache data.
+# For table listing project cache data
 heads = ["Work ID", "LIT ID", "Title (EN)", "Title (JP)"]
 col_widths = [7, 6, 30, 30]
 
 cols = 8  # Currently eight (8) columns are set in pagination webpage.
+
+lang_iso_2 = "en"  # Two-character language ISO code
 
 # Load .env file.
 load_dotenv()
@@ -211,7 +213,7 @@ def prepare_files() -> None:
                     ensure_path_exists(psd_dest_w, "folder")
                     w_psd_ch_folders.append(psd_dest_w)
 
-                psd_name_w = f"{'GTNP' if gtn == '○' else ''}{title_vol}_{ch_4}_{int(page_num):03}"
+                psd_name_w = f"{'GTNP ' if gtn == '○' else ''}{lang_iso_2}_{title_vol}_{ch_4}_{int(page_num):03}"
 
                 copy_file(psd_files_dir, psd_dest_w, psd_name, "psd")
                 rename_path(
@@ -543,6 +545,52 @@ def str_to_list(raw_text: str) -> list[list[str,]]:
     return [items[i : i + cols] for i in range(0, total_count, cols)]
 
 
+def pre_lang():
+    """
+    Rename folder (and files) by prefixing two-character ISO language code.
+    Creates a copy of the folder/file set.
+    """
+    print("\n>>> Select folder to process ...")
+
+    dirpath_0 = str(identify_path("folder"))
+    parent, base_0 = display_path_desc(dirpath_0, "folder")
+
+    dirpath_1 = parse_pathname(parent, f"{lang_iso_2}_{base_0}", "", "folder")
+
+    display_message("INFO", "New directory to be created.")
+    display_path_desc(dirpath_1, "folder")
+
+    # Create new folder.
+    if not ensure_path_exists(dirpath_1, "folder"):
+        display_message("WARN", "Terminating process.")
+        return
+
+    file_list = os.listdir(dirpath_0)
+
+    if len(file_list):
+        print("\n>>> Processing files ...")
+    else:
+        display_message("WARN", "Empty folder.")
+
+    for filename in file_list:
+        print("")
+        hor_bar(100, f"Processing '{filename}' ...")
+
+        if not filename.split(".")[-1].upper() == "PSD":
+            display_message("WARN", f"Skip '{filename}'.")
+            continue
+
+        # Copy file to new directory, then rename; filename includes extension name.
+        copy_file(dirpath_0, dirpath_1, filename, "")
+
+        filepath_0 = parse_pathname(dirpath_1, filename, "", "file")
+        filepath_1 = parse_pathname(dirpath_1, f"{lang_iso_2}_{filename}", "", "file")
+        rename_path(filepath_0, filepath_1, "file")
+
+        print("")
+        hor_bar(100)
+
+
 if __name__ == "__main__":
     welcome_sequence([mod_name, f"ver {mod_ver} {date}", email])
 
@@ -551,5 +599,30 @@ if __name__ == "__main__":
     confirm_exit = False
 
     while not confirm_exit:
-        prepare_files()
-        confirm_exit = continue_sequence()
+        proper_resp = False
+        resp = "C"
+
+        while not proper_resp:
+            print(
+                "\n>>> Select an option :"
+                "\n>>>  [P]repare reference files ?"
+                "\n>>>  Prefix [L]anguage code ?"
+                "\n>>>  E[X]it and close this window ?"
+            )
+
+            resp = input(">>> ").upper()
+
+            proper_resp = True if resp in ["P", "L", "X"] else False
+
+        if resp == "X":
+            print("\n<=> Closing down ...")
+
+            confirm_exit = True
+        else:
+            confirm_exit = False
+
+            if resp == "P":
+                prepare_files()
+
+            if resp == "L":
+                pre_lang()

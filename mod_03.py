@@ -133,7 +133,7 @@ def compile_pdf_file(image_paths: list, pdf_path: str) -> None:
         display_message("ERROR", "Failed to compile revision PDF file.", f"{e}")
 
 
-def gen_revision_pathnames(parent_dir, basename) -> tuple[str, ...]:
+def gen_revision_pathnames(parent_dir: str, basename: str) -> tuple[str, ...]:
     psd_path = ""
     jpeg_path = ""
     pdf_path = ""
