@@ -572,9 +572,9 @@ def pre_lang():
     else:
         display_message("WARN", "Empty folder.")
 
-    for filename in file_list:
+    for index, filename in enumerate(file_list):
         print("")
-        hor_bar(100, f"Processing '{filename}' ...")
+        hor_bar(100, f"Processing '{filename}' ({index + 1} of {len(file_list)})...")
 
         if not filename.split(".")[-1].upper() == "PSD":
             display_message("WARN", f"Skip '{filename}'.")

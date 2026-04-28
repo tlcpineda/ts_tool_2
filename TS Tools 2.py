@@ -3,14 +3,14 @@ A compilation of modules to assist in local processes during typesetting.
 """
 
 from lib import hor_bar, welcome_sequence
-from mod_00 import prepare_files
+from mod_00 import pre_lang, prepare_files
 from mod_01A import create_pre_csv
 from mod_01B import finalise_csv
 from mod_03 import compile_revision
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "2.00.00"
+app_ver = "3.00.00"
 date = "13 Apr 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
@@ -18,6 +18,11 @@ options = [
         "menu": "[P]repare reference files",
         "shortkey": "P",
         "func": prepare_files,
+    },
+    {
+        "menu": "Prefix [L]anguage code",
+        "shortkey": "L",
+        "func": pre_lang,
     },
     {
         "menu": "[S]crape translations",

@@ -9,6 +9,7 @@ from lib import (
     display_message,
     display_path_desc,
     ensure_path_exists,
+    hor_bar,
     identify_path,
     parse_pathname,
     welcome_sequence,
@@ -53,24 +54,27 @@ def compile_revision() -> None:
         ensure_path_exists(jpeg_dir, "folder")
 
         for file_ind, filename in enumerate(psd_files):
-            source_file = os.path.join(input_path, filename)
+            print("")
+            hor_bar(100, f"Processing {filename} ({file_ind + 1} of {len(psd_files)})")
 
-            display_message(
-                "INFO", f"Processing file {file_ind} of {len(psd_files)}..."
-            )
-            display_path_desc(source_file, "file")
+            source_file = os.path.join(input_path, filename)
+            s_parent, s_basename = display_path_desc(source_file, "file")
+
+            s_basename = os.path.splitext(filename)[0]
 
             # Create matchng JPEG file.
             with Image.open(source_file) as img:
-                base_filename = os.path.splitext(filename)[0]
                 img_mode = "CMYK" if img.mode == "CMYK" else "RGB"
                 rgb_img = img.convert(img_mode)
-                jpeg_path = save_jpeg(rgb_img, jpeg_dir, base_filename)
+                jpeg_path = save_jpeg(rgb_img, jpeg_dir, s_basename)
 
                 # Append path of saved JPEG file, file PDF compilation.
                 for_pdf_pages.append(jpeg_path)
 
-            copy_file(source_file, psd_dir, base_filename, "psd")
+            copy_file(input_path, psd_dir, s_basename, "psd")
+
+            print("")
+            hor_bar(100)
 
         if for_pdf_pages:
             for_pdf_pages = [p for p in for_pdf_pages if p.strip()]

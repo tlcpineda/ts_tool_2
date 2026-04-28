@@ -239,10 +239,10 @@ def expand_path(path_short: str) -> str:
     return os.path.normpath(os.path.expanduser(path_short))
 
 
-def copy_file(source_path: str, dest_path: str, filename: str, extname: str) -> None:
+def copy_file(source_dir: str, dest_dir: str, filename: str, extname: str) -> None:
     # Creates a copy of the file (Manual Binary Copy) to revision folder.
-    file_path_0 = parse_pathname(source_path, filename, extname, "file")
-    file_path_1 = parse_pathname(dest_path, filename, extname, "file")
+    file_path_0 = parse_pathname(source_dir, filename, extname, "file")
+    file_path_1 = parse_pathname(dest_dir, filename, extname, "file")
 
     try:
         with open(file_path_0, "rb") as f_src:
@@ -254,7 +254,7 @@ def copy_file(source_path: str, dest_path: str, filename: str, extname: str) -> 
                         break
                     f_dst.write(chunk)
 
-        display_message("SUCCESS", f"File copied to '{os.path.basename(dest_path)}'.")
+        display_message("SUCCESS", f"File copied to '{os.path.basename(dest_dir)}'.")
         display_path_desc(file_path_1, "file")
 
     except Exception as e:
