@@ -203,9 +203,8 @@ def prepare_files() -> None:
                 # Save a copy of the PSD file, then renamed, in the working folder.
                 psd_dest_w = parse_pathname(
                     proj_parent,
-                    # f"V{int(vol_num):02} - {ch_name}",
                     f"Initialise Files/V{int(vol_num):02} - {ch_name}",
-                    f"{title_vol}_{ch_4}",
+                    f"{lang_iso_2}_{title_vol}_{ch_4}",
                     "folder",
                 )
 

@@ -191,7 +191,7 @@ def count_rev_dirs(directory: str, is_main: bool) -> str:
 
 def filter_files(source_path: str) -> list:
     """
-    Filter files that follow the filename pattern, with the last two/three digits as the page markers.
+    Filter files that follow the filename pattern.
     :param folder: The parent folder of the PSD files
     :return filtered_files: The list of filtered PSD files to be compiled
     """
