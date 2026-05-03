@@ -1,9 +1,13 @@
 import json
 import math
 import os
+import time
 import tkinter as tk
 from datetime import datetime, timezone
 
+from box_sdk_gen import BoxAPIError, BoxClient, BoxDeveloperTokenAuth
+
+# from box_sdk_gen.client import BoxAPIError
 from dotenv import load_dotenv
 
 from lib import (
@@ -62,6 +66,7 @@ lang_iso_2 = "en"  # Two-character language ISO code
 # Load .env file.
 load_dotenv()
 SRC_WEBAPP = os.getenv("WEBAPP", "")
+BOX_DEV_CONSOLE = os.getenv("BOX_DEV_CONSOLE", "")
 PROJ_CACHE = expand_path(os.getenv("PROJ_CACHE", ""))
 PROJ_DIR = expand_path(os.getenv("PARENT_LOCAL", ""))
 
@@ -595,6 +600,155 @@ def pre_lang():
         hor_bar(100)
 
 
+def pre_lang_box():
+    """
+    Affix two-character ISO language code to files already in Box;
+    intended as an ad-hoc function.
+    """
+
+    def box_delay(sec: int) -> None:
+        time.sleep(sec)
+
+    def extract_folder_id(folder_url: str) -> str:
+        folder_id = ""
+
+        if "folder" in folder_url:
+            folder_id = folder_url.split("/")[-1]
+
+            if "?" in folder_id:
+                folder_id = folder_id.split("?")[0]
+
+        return folder_id
+
+    token = ""
+
+    print("\n<=> Generate token at : ")
+    print(f"\n      {BOX_DEV_CONSOLE}")
+    input("\n>>> Press enter to continue ... ")
+
+    # Input Box Developer Console.
+    while not token:
+        token = input("\n>>> Input Box Developer Token ('Q' to quit) : ").strip()
+
+        if not token:
+            display_message("WARN", "Token is required.")
+        elif token.upper() == "Q":
+            display_message("WARN", "Process terminated.")
+            return
+        else:
+            display_message("INFO", f"Token input : {token}")
+
+    client = BoxClient(auth=BoxDeveloperTokenAuth(token))
+
+    while True:
+        parent_url = input(
+            "\n>>> Input URL of folder to be processed ('Q' to quit) : "
+        ).strip()
+
+        if not parent_url:
+            display_message("WARN", "No URL input.")
+            continue
+
+        if parent_url.upper() == "Q":
+            display_message("WARN", "Terminating process.")
+            break
+
+        # Check if folder to be processed is valid.
+        parent_id = extract_folder_id(parent_url)
+
+        if not parent_id:
+            display_message("ERROR", "Invalid Box folder URL.")
+            continue
+
+        try:
+            parent_folder = client.folders.get_folder_by_id(parent_id)
+            grand_parent = parent_folder.parent
+
+            if not parent_folder:
+                display_message("ERROR", "Invalid Box folder URL.")
+                continue
+
+            print("\n<=> Box Folder Details :")
+            print(f"<=>  Folder ID   : {parent_id}")
+            print(
+                f"<=>  Folder Path : {f'.../{grand_parent.name}/' if grand_parent else ''}{parent_folder.name}"
+            )
+
+            if not parent_folder.item_collection:
+                display_message("WARN", "No items found in selected Box folder.")
+                continue
+
+            folder_entries = parent_folder.item_collection.entries or []
+            target_names = ["JPEG", "PSD", "JPG"]  # Expected subfolder names
+
+            target_folders = [
+                entry
+                for entry in folder_entries
+                if (entry.name or "").upper() in target_names and entry.type == "folder"
+            ]
+
+            if not target_folders:
+                display_message(
+                    "ERROR",
+                    f"Subfolders 'JPEG' and 'PSD'  not found in folder (ID : {parent_id}).",
+                )
+                continue
+
+            for folder_index, folder in enumerate(target_folders):
+                display_message(
+                    "INFO",
+                    f"Processing folder '{folder.name}' ({folder_index + 1} / {len(target_folders)}) ... ",
+                )
+
+                subfolder = client.folders.get_folder_by_id(folder.id)
+
+                if not subfolder.item_collection:
+                    continue
+
+                entries = subfolder.item_collection.entries or []
+
+                if not entries:
+                    display_message(
+                        "ERROR", f"No items found in folder '{folder.name}'."
+                    )
+                    continue
+
+                for entry_index, entry in enumerate(entries):
+                    display_message(
+                        "INFO",
+                        f"Processing '{entry.name}' ({entry_index + 1} / {len(entries)}) ... ",
+                    )
+
+                    if entry.type == "file":
+                        if (entry.name or "").startswith(lang_iso_2):
+                            print("<=>  Skip file.")
+                        else:
+                            # rename_file(entry.id)
+                            file = client.files.update_file_by_id(
+                                file_id=entry.id, name=f"{lang_iso_2}_{entry.name}"
+                            )
+
+                            print(
+                                f"<=>  File renamed : \
+                                \n<=>   From : {entry.name}\
+                                \n<=>   To   : {file.name}"
+                            )
+
+                    box_delay(1)
+
+                hor_bar(100)
+                box_delay(3)
+
+        except Exception as e:
+            display_message(
+                "ERROR",
+                "Failed to renamed files.",
+                f"{e}",
+            )
+            break
+    return
+
+
 if __name__ == "__main__":
     welcome_sequence([mod_name, f"ver {mod_ver} {date}", email])
 
@@ -611,12 +765,13 @@ if __name__ == "__main__":
                 "\n>>> Select an option :"
                 "\n>>>  [P]repare reference files ?"
                 "\n>>>  Prefix [L]anguage code ?"
+                "\n>>>  Rename [B]ox files ?"
                 "\n>>>  E[X]it and close this window ?"
             )
 
             resp = input(">>> ").upper()
 
-            proper_resp = True if resp in ["P", "L", "X"] else False
+            proper_resp = True if resp in ["P", "L", "X", "B"] else False
 
         if resp == "X":
             print("\n<=> Closing down ...")
@@ -630,3 +785,6 @@ if __name__ == "__main__":
 
             if resp == "L":
                 pre_lang()
+
+            if resp == "B":
+                pre_lang_box()

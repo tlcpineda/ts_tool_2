@@ -2,15 +2,15 @@
 A compilation of modules to assist in local processes during typesetting.
 """
 
-from lib import hor_bar, welcome_sequence
-from mod_00 import pre_lang, prepare_files
+from lib import display_message, hor_bar, welcome_sequence
+from mod_00 import pre_lang, pre_lang_box, prepare_files
 from mod_01A import create_pre_csv
 from mod_01B import finalise_csv
 from mod_03 import compile_revision
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "3.02.00"
+app_ver = "3.03.00"
 date = "29 Apr 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
@@ -23,6 +23,11 @@ options = [
         "menu": "Prefix [L]anguage code",
         "shortkey": "L",
         "func": pre_lang,
+    },
+    {
+        "menu": "Rename files in [B]ox",
+        "shortkey": "B",
+        "func": pre_lang_box,
     },
     {
         "menu": "[S]crape translations",
@@ -72,10 +77,12 @@ if __name__ == "__main__":
         user_input = None
 
         while not user_input:
-            resp = input(">>> ").upper()
+            resp = input(">>> ").upper().strip()
 
             if resp in [option["shortkey"] for option in options]:
                 user_input = resp
+            else:
+                display_message("WARN", "Invalid option.")
 
         if user_input == "X":
             hor_bar(60, "CLOSING DOWN ...")
