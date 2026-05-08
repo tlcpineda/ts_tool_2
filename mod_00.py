@@ -5,9 +5,7 @@ import time
 import tkinter as tk
 from datetime import datetime, timezone
 
-from box_sdk_gen import BoxAPIError, BoxClient, BoxDeveloperTokenAuth
-
-# from box_sdk_gen.client import BoxAPIError
+from box_sdk_gen import BoxClient, BoxDeveloperTokenAuth
 from dotenv import load_dotenv
 
 from lib import (
@@ -620,6 +618,7 @@ def pre_lang_box():
 
         return folder_id
 
+    # Start of new box_lib entry.
     token = ""
 
     print("\n<=> Generate token at : ")
@@ -639,6 +638,7 @@ def pre_lang_box():
             display_message("INFO", f"Token input : {token}")
 
     client = BoxClient(auth=BoxDeveloperTokenAuth(token))
+    # End of new box_lib entry.
 
     while True:
         parent_url = input(
