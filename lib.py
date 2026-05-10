@@ -362,6 +362,63 @@ def load_proj_cache(cache_path) -> LogManager:
     return cache
 
 
+def get_term_details(cache: LogManager) -> tuple[str, ...]:
+    proj_det = {}
+    lit_id = ""
+    title_en = ""
+    vol_num = ""
+    term = ""
+
+    projects = cache.load()
+    work_ids = [proj["work_id"] for proj in projects]
+
+    resp = False
+    work_id = ""
+
+    show_proj_in_cache(projects)
+    while not resp:
+        work_id = input(
+            "\n>>> Enter 'Work ID' to select project (or '0' for a new project) : "
+        ).strip()
+
+        if work_id in work_ids or work_id == "0":
+            resp = True
+        else:
+            display_message(
+                "WARN",
+                f"'{work_id}' is not a valid input.",
+            )
+
+    if int(work_id):
+        # Extract project details based on work_id (ultimately from index of the project on the cache).
+        proj_index = work_ids.index(work_id)
+        proj_det = cache.__getitem__(proj_index)
+        display_message("INFO", "Project selected from cache.")
+
+    else:
+        proj_det = get_proj_details()  # Get details as user input.
+        cache.add(proj_det)
+
+    lit_id = proj_det["lit_id"]
+    title_en = proj_det["title_en"]
+    proj_name = f"LIT{int(lit_id):03} {proj_det['title_jp']}"
+
+    print(f"<=>  #{work_id} {proj_name} ( {title_en} )")
+
+    vol_num = input("\n>>> Enter volume number : ").strip()
+    vol_num, _ = clean_number(vol_num)
+
+    while not term:
+        term_num = input("\n>>> Enter term number (0#) : ").strip()
+
+        if term_num:
+            term = f"Term {int(term_num):02}"
+        else:
+            display_message("WARN", "Term number cannot be blank.")
+
+    return work_id, proj_name, title_en, vol_num, term
+
+
 def get_proj_details():
     created = datetime.now(timezone.utc).isoformat()
     proj_det = {

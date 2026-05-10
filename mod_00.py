@@ -5,14 +5,13 @@ import tkinter as tk
 from dotenv import load_dotenv
 
 from lib import (
-    LogManager,
     clean_number,
     copy_file,
     display_message,
     display_path_desc,
     ensure_path_exists,
     expand_path,
-    get_proj_details,
+    get_term_details,
     hor_bar,
     identify_path,
     load_csv,
@@ -250,9 +249,7 @@ def gen_pagination() -> tuple[list[list[str]], str, str, str]:
     try:
         cache = load_proj_cache(PROJ_CACHE)
 
-        show_proj_in_cache(cache.load())
-
-        work_id, proj_name, title_en, vol_num = get_vol_details(cache)
+        work_id, proj_name, title_en, vol_num, _ = get_term_details(cache)
         title_vol = f"{title_en}_{int(vol_num):03}"
 
         print(f"\n<=> Generating pagination data for ' {title_vol} ' ... ")
@@ -277,52 +274,6 @@ def gen_pagination() -> tuple[list[list[str]], str, str, str]:
         display_message("ERROR", "Failed to generate pagination data.", f"{e}")
 
         return [], "", "", ""
-
-
-def get_vol_details(proj_cache: LogManager) -> tuple[str, ...]:
-    proj_det = {}
-    lit_id = ""
-    title_en = ""
-    vol_num = ""
-
-    work_ids = [proj["work_id"] for proj in proj_cache.load()]
-
-    resp = False
-    work_id = ""
-
-    while not resp:
-        work_id = input(
-            "\n>>> Enter 'Work ID' to select project (or '0' for a new project): "
-        ).strip()
-
-        if work_id in work_ids or work_id == "0":
-            resp = True
-        else:
-            display_message(
-                "WARN",
-                f"'{work_id}' is not a valid input.",
-            )
-
-    if int(work_id):
-        # Extract project details based on work_id (ultimately from index of the project on the cache).
-        proj_index = work_ids.index(work_id)
-        proj_det = proj_cache.__getitem__(proj_index)
-        display_message("INFO", "Project selected from cache.")
-
-    else:
-        proj_det = get_proj_details()  # Get details as user input.
-        proj_cache.add(proj_det)
-
-    lit_id = proj_det["lit_id"]
-    title_en = proj_det["title_en"]
-    proj_name = f"LIT{int(lit_id):03} {proj_det['title_jp']}"
-
-    print(f"<=>  #{work_id} {proj_name} ( {title_en} )")
-
-    vol_num = input("\n>>> Enter volume number : ").strip()
-    vol_num, _ = clean_number(vol_num)
-
-    return work_id, proj_name, title_en, vol_num
 
 
 def get_webapp_data(id: str, vol: str, title_vol: str) -> list[list[str,]]:
