@@ -1,33 +1,34 @@
-import json
 import math
 import os
-import time
 import tkinter as tk
-from datetime import datetime, timezone
 
-from box_sdk_gen import BoxClient, BoxDeveloperTokenAuth
 from dotenv import load_dotenv
 
 from lib import (
+    LogManager,
     clean_number,
     copy_file,
     display_message,
     display_path_desc,
     ensure_path_exists,
     expand_path,
+    get_proj_details,
     hor_bar,
     identify_path,
     load_csv,
+    load_proj_cache,
     parse_pathname,
     rename_path,
+    show_proj_in_cache,
+    show_table,
     welcome_sequence,
     write_to_csv,
 )
 
 # Module variables
 mod_name = "Preliminary Administrative Works"
-mod_ver = "2"
-date = "28 Apr 2026"
+mod_ver = "3"
+date = "10 May 2026"
 email = "tlcpineda.projects@gmail.com"
 csv_name_pre = "numbering_tbl"
 csv_heads = [
@@ -53,10 +54,6 @@ csv_heads = [
     ],
 ]
 
-# For table listing project cache data
-heads = ["Work ID", "LIT ID", "Title (EN)", "Title (JP)"]
-col_widths = [7, 6, 30, 30]
-
 cols = 8  # Currently eight (8) columns are set in pagination webpage.
 
 lang_iso_2 = "en"  # Two-character language ISO code
@@ -67,67 +64,6 @@ SRC_WEBAPP = os.getenv("WEBAPP", "")
 BOX_DEV_CONSOLE = os.getenv("BOX_DEV_CONSOLE", "")
 PROJ_CACHE = expand_path(os.getenv("PROJ_CACHE", ""))
 PROJ_DIR = expand_path(os.getenv("PARENT_LOCAL", ""))
-
-
-class LogManager:
-    def __init__(self, log_path):
-        self.log_path = os.path.normpath(log_path)
-        self.log = self.load()
-
-    def __getitem__(self, index):
-        return self.log[index]
-
-    def __iter__(self):
-        return iter(self.log)
-
-    def __len__(self):
-        return len(self.log)
-
-    def add(self, entry):
-        """
-        Adds the new entry (dict) to log (list).
-        """
-        self.log.append(entry)
-        return self.save()
-
-    def load(self):
-        """Read the JSON log file; returns a list."""
-        if os.path.exists(self.log_path):
-            try:
-                with open(self.log_path, "r", encoding="utf-8") as log_file:
-                    data = json.load(log_file)
-                    return data if isinstance(data, list) else []
-
-            except (json.JSONDecodeError, IOError) as e:
-                display_message(
-                    "WARN",
-                    f"Cannot read log file : {os.path.basename(self.log_path)}",
-                    f"{e}",
-                )
-
-                return []
-        return []
-
-    def save(self):
-        """Save data to specified log file."""
-        base = os.path.basename(self.log_path)
-        temp_path = self.log_path + ".tmp"  # in case of fatal error in write process
-
-        try:
-            with open(temp_path, "w", encoding="utf-8") as log_file:
-                json.dump(self.log, log_file, indent=2, ensure_ascii=False)
-
-            # Replace the official file, by the temp file.
-            os.replace(temp_path, self.log_path)
-            display_message("INFO", f'New entry added to "{base}".')
-            return True
-        except Exception as e:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-
-            display_message("WARN", f"File save failed : {base}", f"{e}")
-            display_path_desc(self.log_path, "file")
-            return False
 
 
 def prepare_files() -> None:
@@ -312,16 +248,10 @@ def verify_contents_ref_folder(
 
 def gen_pagination() -> tuple[list[list[str]], str, str, str]:
     try:
-        cache = load_proj_cache()
+        cache = load_proj_cache(PROJ_CACHE)
 
-        table_title = "PROJECT CACHE DATA"
-        table = [
-            [row["work_id"], row["lit_id"], row["title_en"], row["title_jp"]]
-            for row in cache.load()
-        ]
+        show_proj_in_cache(cache.load())
 
-        # Show table of project titles.
-        show_table(table_title, col_widths, heads, table)
         work_id, proj_name, title_en, vol_num = get_vol_details(cache)
         title_vol = f"{title_en}_{int(vol_num):03}"
 
@@ -347,81 +277,6 @@ def gen_pagination() -> tuple[list[list[str]], str, str, str]:
         display_message("ERROR", "Failed to generate pagination data.", f"{e}")
 
         return [], "", "", ""
-
-
-def load_proj_cache() -> LogManager:
-    cache_path = PROJ_CACHE
-
-    display_message("INFO", "Loading project cache ... ")
-    display_path_desc(cache_path, "file")
-
-    cache = LogManager(cache_path)
-
-    if not cache.load():
-        display_message(
-            "WARN", "File not found, or file is empty.  Add first entry ..."
-        )
-        cache.add(get_proj_details())
-
-    return cache
-
-
-def get_proj_details():
-    created = datetime.now(timezone.utc).isoformat()
-    proj_det = {
-        "created": created,
-        "work_id": "",
-        "lit_id": "",
-        "title_jp": "",
-        "title_en": "",
-    }
-
-    print("\n>>> Add new project details ... ")
-
-    keys = proj_det.keys()
-    max_len_key = max(len(key) for key in keys)
-
-    for key in keys:
-        proj_val = proj_det[key]
-        while not proj_val:
-            proj_val = input(f">>>  {key:<{max_len_key}} : ").strip()
-            if proj_val:
-                proj_det[key] = proj_val
-
-    return proj_det
-
-
-def show_table(main_head: str, col_width: list, heads: list, table: list) -> None:
-    line_width = max(
-        3 + sum(col_width) + len(col_width) * 3 + 2, len(main_head) + 2 * (2 + 5)
-    )
-
-    print("")
-
-    hor_bar(line_width, main_head.upper())
-
-    print("")
-
-    for index, row in enumerate([heads] + table):
-        line = "<=>  "
-
-        for jndex, item in enumerate(row):
-            col_len = col_width[jndex]
-
-            terminal_bar = " " if jndex == len(row) - 1 else "|"
-
-            if index == 0:
-                line += f" {item:^{col_len}} {terminal_bar}"
-            else:
-                if jndex == 0 or jndex == 1:
-                    line += f" {item:>{col_len}} {terminal_bar}"
-                else:
-                    line += f" {item if len(item) <= col_len else f'{item[: col_len - 3]}...':<{col_len}} {terminal_bar}"
-
-        print(line)
-
-    print("")
-    hor_bar(line_width)
 
 
 def get_vol_details(proj_cache: LogManager) -> tuple[str, ...]:
@@ -598,157 +453,6 @@ def pre_lang():
         hor_bar(100)
 
 
-def pre_lang_box():
-    """
-    Affix two-character ISO language code to files already in Box;
-    intended as an ad-hoc function.
-    """
-
-    def box_delay(sec: int) -> None:
-        time.sleep(sec)
-
-    def extract_folder_id(folder_url: str) -> str:
-        folder_id = ""
-
-        if "folder" in folder_url:
-            folder_id = folder_url.split("/")[-1]
-
-            if "?" in folder_id:
-                folder_id = folder_id.split("?")[0]
-
-        return folder_id
-
-    # Start of new box_lib entry.
-    token = ""
-
-    print("\n<=> Generate token at : ")
-    print(f"\n      {BOX_DEV_CONSOLE}")
-    input("\n>>> Press enter to continue ... ")
-
-    # Input Box Developer Console.
-    while not token:
-        token = input("\n>>> Input Box Developer Token ('Q' to quit) : ").strip()
-
-        if not token:
-            display_message("WARN", "Token is required.")
-        elif token.upper() == "Q":
-            display_message("WARN", "Process terminated.")
-            return
-        else:
-            display_message("INFO", f"Token input : {token}")
-
-    client = BoxClient(auth=BoxDeveloperTokenAuth(token))
-    # End of new box_lib entry.
-
-    while True:
-        parent_url = input(
-            "\n>>> Input URL of folder to be processed ('Q' to quit) : "
-        ).strip()
-
-        if not parent_url:
-            display_message("WARN", "No URL input.")
-            continue
-
-        if parent_url.upper() == "Q":
-            display_message("WARN", "Terminating process.")
-            break
-
-        # Check if folder to be processed is valid.
-        parent_id = extract_folder_id(parent_url)
-
-        if not parent_id:
-            display_message("ERROR", "Invalid Box folder URL.")
-            continue
-
-        try:
-            parent_folder = client.folders.get_folder_by_id(parent_id)
-            grand_parent = parent_folder.parent
-
-            if not parent_folder:
-                display_message("ERROR", "Invalid Box folder URL.")
-                continue
-
-            print("\n<=> Box Folder Details :")
-            print(f"<=>  Folder ID   : {parent_id}")
-            print(
-                f"<=>  Folder Path : {f'.../{grand_parent.name}/' if grand_parent else ''}{parent_folder.name}"
-            )
-
-            if not parent_folder.item_collection:
-                display_message("WARN", "No items found in selected Box folder.")
-                continue
-
-            folder_entries = parent_folder.item_collection.entries or []
-            target_names = ["JPEG", "PSD", "JPG"]  # Expected subfolder names
-
-            target_folders = [
-                entry
-                for entry in folder_entries
-                if (entry.name or "").upper() in target_names and entry.type == "folder"
-            ]
-
-            if not target_folders:
-                display_message(
-                    "ERROR",
-                    f"Subfolders 'JPEG' and 'PSD'  not found in folder (ID : {parent_id}).",
-                )
-                continue
-
-            for folder_index, folder in enumerate(target_folders):
-                display_message(
-                    "INFO",
-                    f"Processing folder '{folder.name}' ({folder_index + 1} / {len(target_folders)}) ... ",
-                )
-
-                subfolder = client.folders.get_folder_by_id(folder.id)
-
-                if not subfolder.item_collection:
-                    continue
-
-                entries = subfolder.item_collection.entries or []
-
-                if not entries:
-                    display_message(
-                        "ERROR", f"No items found in folder '{folder.name}'."
-                    )
-                    continue
-
-                for entry_index, entry in enumerate(entries):
-                    display_message(
-                        "INFO",
-                        f"Processing '{entry.name}' ({entry_index + 1} / {len(entries)}) ... ",
-                    )
-
-                    if entry.type == "file":
-                        if (entry.name or "").startswith(lang_iso_2):
-                            print("<=>  Skip file.")
-                        else:
-                            # rename_file(entry.id)
-                            file = client.files.update_file_by_id(
-                                file_id=entry.id, name=f"{lang_iso_2}_{entry.name}"
-                            )
-
-                            print(
-                                f"<=>  File renamed : \
-                                \n<=>   From : {entry.name}\
-                                \n<=>   To   : {file.name}"
-                            )
-
-                    box_delay(1)
-
-                hor_bar(100)
-                box_delay(3)
-
-        except Exception as e:
-            display_message(
-                "ERROR",
-                "Failed to renamed files.",
-                f"{e}",
-            )
-            break
-    return
-
-
 if __name__ == "__main__":
     welcome_sequence([mod_name, f"ver {mod_ver} {date}", email])
 
@@ -765,13 +469,12 @@ if __name__ == "__main__":
                 "\n>>> Select an option :"
                 "\n>>>  [P]repare reference files ?"
                 "\n>>>  Prefix [L]anguage code ?"
-                "\n>>>  Rename [B]ox files ?"
                 "\n>>>  E[X]it and close this window ?"
             )
 
             resp = input(">>> ").upper()
 
-            proper_resp = True if resp in ["P", "L", "X", "B"] else False
+            proper_resp = True if resp in ["P", "L", "X"] else False
 
         if resp == "X":
             print("\n<=> Closing down ...")
@@ -785,6 +488,3 @@ if __name__ == "__main__":
 
             if resp == "L":
                 pre_lang()
-
-            if resp == "B":
-                pre_lang_box()

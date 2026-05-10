@@ -1,7 +1,70 @@
 import csv
+import json
 import os
 import tkinter as tk
+from datetime import datetime, timezone
 from tkinter import filedialog as fd
+
+
+class LogManager:
+    def __init__(self, log_path):
+        self.log_path = os.path.normpath(log_path)
+        self.log = self.load()
+
+    def __getitem__(self, index):
+        return self.log[index]
+
+    def __iter__(self):
+        return iter(self.log)
+
+    def __len__(self):
+        return len(self.log)
+
+    def add(self, entry):
+        """
+        Adds the new entry (dict) to log (list).
+        """
+        self.log.append(entry)
+        return self.save()
+
+    def load(self):
+        """Read the JSON log file; returns a list."""
+        if os.path.exists(self.log_path):
+            try:
+                with open(self.log_path, "r", encoding="utf-8") as log_file:
+                    data = json.load(log_file)
+                    return data if isinstance(data, list) else []
+
+            except (json.JSONDecodeError, IOError) as e:
+                display_message(
+                    "WARN",
+                    f"Cannot read log file : {os.path.basename(self.log_path)}",
+                    f"{e}",
+                )
+
+                return []
+        return []
+
+    def save(self):
+        """Save data to specified log file."""
+        base = os.path.basename(self.log_path)
+        temp_path = self.log_path + ".tmp"  # in case of fatal error in write process
+
+        try:
+            with open(temp_path, "w", encoding="utf-8") as log_file:
+                json.dump(self.log, log_file, indent=2, ensure_ascii=False)
+
+            # Replace the official file, by the temp file.
+            os.replace(temp_path, self.log_path)
+            display_message("INFO", f'New entry added to "{base}".')
+            return True
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+            display_message("WARN", f"File save failed : {base}", f"{e}")
+            display_path_desc(self.log_path, "file")
+            return False
 
 
 def welcome_sequence(items: list):
@@ -268,3 +331,90 @@ def parse_pathname(parent_dir: str, basename: str, extname: str, pathtype: str) 
         dest_path = os.path.join(parent_dir, basename, extname)
 
     return os.path.normpath(dest_path)
+
+
+def show_proj_in_cache(cache: list) -> None:
+    heads = ["Work ID", "LIT ID", "Title (EN)", "Title (JP)"]
+    col_widths = [7, 6, 30, 30]
+
+    table_title = "PROJECT CACHE DATA"
+    table = [
+        [row["work_id"], row["lit_id"], row["title_en"], row["title_jp"]]
+        for row in cache
+    ]
+
+    # Show table of project titles.
+    show_table(table_title, col_widths, heads, table)
+
+
+def load_proj_cache(cache_path) -> LogManager:
+    display_message("INFO", "Loading project cache ... ")
+    display_path_desc(cache_path, "file")
+
+    cache = LogManager(cache_path)
+
+    if not cache.load():
+        display_message(
+            "WARN", "File not found, or file is empty.  Add first entry ..."
+        )
+        cache.add(get_proj_details())
+
+    return cache
+
+
+def get_proj_details():
+    created = datetime.now(timezone.utc).isoformat()
+    proj_det = {
+        "created": created,
+        "work_id": "",
+        "lit_id": "",
+        "title_jp": "",
+        "title_en": "",
+    }
+
+    print("\n>>> Add new project details ... ")
+
+    keys = proj_det.keys()
+    max_len_key = max(len(key) for key in keys)
+
+    for key in keys:
+        proj_val = proj_det[key]
+        while not proj_val:
+            proj_val = input(f">>>  {key:<{max_len_key}} : ").strip()
+            if proj_val:
+                proj_det[key] = proj_val
+
+    return proj_det
+
+
+def show_table(main_head: str, col_width: list, heads: list, table: list) -> None:
+    line_width = max(
+        3 + sum(col_width) + len(col_width) * 3 + 2, len(main_head) + 2 * (2 + 5)
+    )
+
+    print("")
+
+    hor_bar(line_width, main_head.upper())
+
+    print("")
+
+    for index, row in enumerate([heads] + table):
+        line = "<=>  "
+
+        for jndex, item in enumerate(row):
+            col_len = col_width[jndex]
+
+            terminal_bar = " " if jndex == len(row) - 1 else "|"
+
+            if index == 0:
+                line += f" {item:^{col_len}} {terminal_bar}"
+            else:
+                if jndex == 0 or jndex == 1:
+                    line += f" {item:>{col_len}} {terminal_bar}"
+                else:
+                    line += f" {item if len(item) <= col_len else f'{item[: col_len - 3]}...':<{col_len}} {terminal_bar}"
+
+        print(line)
+
+    print("")
+    hor_bar(line_width)
