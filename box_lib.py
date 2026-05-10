@@ -3,9 +3,12 @@ import os
 from box_sdk_gen import (
     BoxClient,
     BoxDeveloperTokenAuth,
+    CreateFolderParent,
     FileFull,
+    FilesManager,
     FolderFull,
     FolderMini,
+    FoldersManager,
     Item,
 )
 from dotenv import load_dotenv
@@ -15,6 +18,7 @@ from lib import display_message
 # Load .env file.
 load_dotenv()
 BOX_DEV_CONSOLE = os.getenv("BOX_DEV_CONSOLE", "")
+TS_PARENT = os.getenv("TS_PARENT", "")
 
 
 def init_client() -> BoxClient | None:
@@ -46,6 +50,19 @@ def init_client() -> BoxClient | None:
         return None
 
 
+def init_mngr(
+    client: BoxClient, entry_type: str
+) -> FoldersManager | FilesManager | None:
+
+    try:
+        return getattr(client, f"{entry_type.lower()}s")
+    except Exception as e:
+        display_message(
+            "ERROR", f"Failed to create {entry_type.title()} Manager.", f"{e}"
+        )
+        return None
+
+
 def extract_entry_meta(entry_url: str) -> tuple[str, str]:
     entry_type = ""
     entry_id = ""
@@ -69,21 +86,23 @@ def fetch_entry(
 
     entry_type, entry_id = extract_entry_meta(entry_url)
     method, kwargs = params
-    folder_m, file_m = client.folders, client.files
+
+    manager = init_mngr(client, entry_type)
+
+    if not manager:
+        return None
+    print(manager)
 
     funcs = {
-        "folder": {
-            "info": folder_m.get_folder_by_id,
-            "update": folder_m.update_folder_by_id,
-        },
-        "file": {
-            "info": file_m.get_file_by_id,
-            "update": file_m.update_file_by_id,
-        },
+        "info": getattr(manager, f"get_{entry_type}_by_id"),
+        "update": getattr(manager, f"update_{entry_type}_by_id"),
+        "copy": getattr(manager, f"copy_{entry_type}"),
     }
 
     if entry_type and entry_id:
-        return def_entry(funcs[entry_type][method], entry_id, **kwargs)
+        return def_entry(funcs[method], entry_id, **kwargs)
+
+    return None
 
 
 def display_box_path(client: BoxClient, entry_url: str) -> None:
@@ -128,6 +147,31 @@ def display_box_path(client: BoxClient, entry_url: str) -> None:
         )
 
 
+def create_box_folder(
+    client: BoxClient, parent_url: str, target_name: str
+) -> FolderFull | None:
+    _, parent_id = extract_entry_meta(parent_url)
+    target = None
+
+    try:
+        display_message("INFO", f'Creating "{target_name}" in parent ... ')
+
+        manager = init_mngr(client, "folder")
+
+        if type(manager) is FoldersManager:
+            target = manager.create_folder(
+                target_name, CreateFolderParent(id=parent_id)
+            )
+
+        if target:
+            display_message("SUCCESS", f'New folder "{target_name}" created.')
+
+    except Exception as e:
+        display_message("ERROR", f'Failed to create "{target_name}" in parent.', f"{e}")
+
+    return target
+
+
 def rename_box_entry(client: BoxClient, entry_url: str, new_entry_name: str):
     entry_type, entry_id = extract_entry_meta(entry_url)
 
@@ -150,11 +194,12 @@ def rename_box_entry(client: BoxClient, entry_url: str, new_entry_name: str):
         )
 
 
-def move_box_entry(client: BoxClient, entry_url: str):
+def move_box_entry(client: BoxClient, entry_url: str, default_loc: bool):
     # Move entry one level up within path_collection; index -2 of path collection
     move_up_one = -2
     entry_type, entry_id = extract_entry_meta(entry_url)
     new_parent_id = ""
+    dest_url = ""
 
     try:
         params = [
@@ -162,9 +207,8 @@ def move_box_entry(client: BoxClient, entry_url: str):
             ("update", lambda: {"parent": {"id": new_parent_id}}),
         ]
 
-        dest_url = input(
-            ">>> Input parent URL, or press enter to move on level up along path : "
-        ).strip()
+        if not default_loc:
+            dest_url = input(">>> Input new parent URL : ").strip()
 
         display_message("INFO", f"Moving {entry_type} ... ")
 
@@ -189,6 +233,69 @@ def move_box_entry(client: BoxClient, entry_url: str):
         )
 
 
+# def copy_box_entry(client: BoxClient, entry_url: str):
+#     entry_type, entry_id = extract_entry_meta(entry_url)
+#     new_parent_id = ""
+#     dest_url = ""
+
+#     try:
+#         params = [
+#             ("info", lambda: {}),
+#             ("copy", lambda: {"parent": {"id": new_parent_id}}),
+#         ]
+
+#         # somethng else here
+
+#     except Exception as e:
+#         display_message(
+#             "ERROR", f"Failed to copy {entry_type} (ID : {entry_id}).", f"{e}"
+#         )
+
+
+def ensure_box_path_exists(client: BoxClient, parent_url: str, target_name: str) -> str:
+    _, parent_id = extract_entry_meta(parent_url)
+    display_message(
+        "INFO", f'Checking folder " {target_name} " in parent (ID : {parent_id}) ... '
+    )
+    display_box_path(client, parent_url)
+
+    target_id = ""
+
+    try:
+        children = get_box_entries(client, parent_url)
+
+        if children:
+            target = [child for child in children if child.name == target_name]
+
+            if target:
+                display_message(
+                    "INFO", f'Folder " {target_name} " already exists in parent.'
+                )
+                target_id = target[0].id
+            else:
+                display_message(
+                    "WARN", f'Folder " {target_name} " not found in parent.'
+                )
+        else:
+            display_message("WARN", f'Folder " {target_name} " not found in parent.')
+
+        if not target_id:
+            print(f'>>> Creating " {target_name} " in parent ... ')
+            target = create_box_folder(client, parent_url, target_name)
+
+            if target:
+                target_id = target.id
+
+    except Exception as e:
+        display_message(
+            "ERROR",
+            f'Failed to verify presence and/or create " {target_name} " in parent.',
+            f"{e}",
+        )
+
+    return target_id
+
+
 def get_path_entries(entry: FolderFull | FileFull) -> list[FolderMini]:
     path_collection = entry.path_collection
     return path_collection.entries if path_collection else []
@@ -208,7 +315,7 @@ def get_box_entries(client: BoxClient, folder_url: str) -> list[Item]:
 
         display_message(
             "SUCCESS",
-            f"{disp_msg_i} folder (ID : {folder_id})",
+            f"{disp_msg_i} folder (ID : {folder_id}) .",
         )
 
         return box_entries or []
