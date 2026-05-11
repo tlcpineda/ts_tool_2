@@ -362,12 +362,57 @@ def load_proj_cache(cache_path) -> LogManager:
     return cache
 
 
-def get_term_details(cache: LogManager) -> tuple[str, ...]:
+def parse_chapters(ch_in: str) -> list[str] | None:
+    def list_strip(items: str, sep: str) -> list[str]:
+        list_items = [item.strip() for item in items.split(sep)]
+
+        if sep == "-":
+            t0, t1 = list_items
+            rng = range(int(float(t0)) + 1, int(float(t1)) + 1)
+            list_items = flat([t0, [str(s) for s in rng], t1])
+
+        return list_items
+
+    def flat(items: list[str | list[str]]) -> list[str]:
+        flat_list = []
+
+        for item in items:
+            if isinstance(item, list):
+                for i in item:
+                    flat_list.append(i)
+            else:
+                flat_list.append(item)
+
+        return flat_list
+
+    ch_list = None
+
+    # Split by comma separation.
+    ch_list = list_strip(ch_in, ",")
+
+    # Check if any element is a range; then list range elements.
+    ch_list = flat([ch if "-" not in ch else list_strip(ch, "-") for ch in ch_list])
+
+    # Prefix "CH" on chapter numbers, except for extra chapters (startswith "EX").
+    ch_list = [
+        ch.upper() if ch.upper().startswith("EX") else f"CH{clean_number(ch)[0]}"
+        for ch in ch_list
+    ]
+
+    # Return list of unique entries.
+    return sorted(list(set(ch_list)))
+
+
+def get_term_details(
+    cache: LogManager,
+) -> tuple[str, str, str, str, str, list[str]]:
+
     proj_det = {}
     lit_id = ""
     title_en = ""
     vol_num = ""
     term = ""
+    chapters = []
 
     projects = cache.load()
     work_ids = [proj["work_id"] for proj in projects]
@@ -416,7 +461,17 @@ def get_term_details(cache: LogManager) -> tuple[str, ...]:
         else:
             display_message("WARN", "Term number cannot be blank.")
 
-    return work_id, proj_name, title_en, vol_num, term
+    while not chapters:
+        print(
+            "\n>>> Enter chapters numbers ... \
+            \n>>>  [1] As a range, dash          : 48.5 - 50     ---> [48.5, 48 ,49, 50]\
+            \n>>>  [2] As comma-separated values : 46.5, 49, 55  ---> [46.5, 49, 55]\
+            \n>>>  [3] Or, both                  : 46, 49 - 52.5 ---> [46, 49, 50, 51, 52, 52.5]"
+        )
+        ch_numbers = input(">>> ").strip()
+        chapters = parse_chapters(ch_numbers)
+
+    return work_id, proj_name, title_en, vol_num, term, chapters
 
 
 def get_proj_details():
