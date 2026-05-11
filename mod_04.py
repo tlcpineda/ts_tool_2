@@ -1,25 +1,26 @@
 import os
 import time
 
+from dotenv import load_dotenv
+
 from box_lib import (
     display_box_path,
+    ensure_box_folder_exists,
     extract_entry_meta,
     fetch_entry,
     get_box_entries,
     init_client,
     move_box_entry,
+    parse_box_url,
     rename_box_entry,
 )
 from lib import (
-    clean_number,
-    continue_sequence,
-    copy_file,
     display_message,
-    display_path_desc,
-    ensure_path_exists,
+    expand_path,
+    get_term_details,
     hor_bar,
-    identify_path,
-    parse_pathname,
+    load_proj_cache,
+    show_table,
     welcome_sequence,
 )
 
@@ -30,13 +31,15 @@ date = "09 May 2026"
 email = "tlcpineda.projects@gmail.com"
 lang_iso_2 = "en"
 
+# Load .env file.
+load_dotenv()
+PROJ_CACHE = expand_path(os.getenv("PROJ_CACHE", ""))
+TS_PARENT = os.getenv("TS_PARENT", "")
+CR_PARENT = os.getenv("CR_PARENT", "")
+
 
 def box_delay(sec: int) -> None:
     time.sleep(sec)
-
-
-def parse_box_url(entry_type: str, entry_id: str) -> str:
-    return f"https://app.box.com/{entry_type}/{entry_id}"
 
 
 def prefix_lang_code():
@@ -216,6 +219,52 @@ def move_pdf():
             break
 
 
+def create_term_tree() -> dict[str, str]:
+    chapter_urls = {}
+    # parent_url = TS_PARENT
+    parent_url = "https://app.box.com/folder/0"
+    client = init_client()
+    cache = load_proj_cache(PROJ_CACHE)
+    _, proj_name, title_en, _, term, ch = get_term_details(cache)
+
+    if not client:
+        display_message("ERROR", "Failed to create BoxClient object.")
+        return {}
+
+    try:
+        for branch_name in [term, proj_name, ch]:
+            if isinstance(branch_name, str):
+                hor_bar(100)
+                box_delay(2)
+
+                branch_id = ensure_box_folder_exists(client, parent_url, branch_name)
+
+                if branch_id:
+                    parent_url = parse_box_url("folder", branch_id)
+
+            elif isinstance(branch_name, list):
+                for sibling in branch_name:
+                    hor_bar(100)
+                    box_delay(2)
+                    sibling_id = ensure_box_folder_exists(client, parent_url, sibling)
+                    chapter_urls[sibling] = parse_box_url("folder", sibling_id)
+
+        hor_bar(100)
+
+        show_table(
+            f"New Box Folders for {term} : {proj_name.split(' ')[0]} {title_en}",
+            [3, 10, 50],
+            ["", "Chapters", "Folder URL"],
+            [[i + 1, k, v] for i, (k, v) in enumerate(chapter_urls.items())],
+        )
+
+        return chapter_urls
+
+    except Exception as e:
+        display_message("ERROR", "Failed to create term tree in Box.", f"{e}")
+        return {}
+
+
 if __name__ == "__main__":
     welcome_sequence([mod_name, f"ver {mod_ver} {date}", email])
 
@@ -231,13 +280,14 @@ if __name__ == "__main__":
             print(
                 "\n>>> Select an option :"
                 "\n>>>  Rename [B]ox files (EN) ?"
-                "\n>>>  [M]ove file to term folder ?"
+                "\n>>>  [M]ove PDF files to term folder ?"
+                "\n>>>  [C]reate typesetting term folder ?"
                 "\n>>>  E[X]it and close this window ?"
             )
 
             resp = input(">>> ").upper()
 
-            proper_resp = True if resp in ["B", "M", "X"] else False
+            proper_resp = True if resp in ["B", "C", "M", "X"] else False
 
         if resp == "X":
             print("\n<=> Closing down ...")
@@ -251,3 +301,6 @@ if __name__ == "__main__":
 
             if resp == "M":
                 move_pdf()
+
+            if resp == "C":
+                create_term_tree()

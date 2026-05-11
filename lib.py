@@ -471,6 +471,27 @@ def get_term_details(
         ch_numbers = input(">>> ").strip()
         chapters = parse_chapters(ch_numbers)
 
+    hor_bar(100)
+
+    show_table(
+        "Input Summary",
+        [
+            3,
+            16,
+            max(40, min(len(f"{chapters}"), 81)),
+        ],
+        ["", "Parameters", "Input Value(s)"],
+        [
+            ["1", "Work ID", work_id],
+            ["2", "Project Name", proj_name],
+            ["3", "Title (EN)", title_en],
+            ["4", "Volume", vol_num],
+            ["5", "Term", term],
+            ["6", "Chapter List", f"{chapters}"],
+        ],
+    )
+    print("")
+
     return work_id, proj_name, title_en, vol_num, term, chapters
 
 

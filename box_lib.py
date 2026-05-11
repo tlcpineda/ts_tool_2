@@ -122,7 +122,7 @@ def display_box_path(client: BoxClient, entry_url: str) -> None:
 
             display_path += "/".join(path_names)
 
-            return display_path
+            return display_path or "---"
 
         entry = fetch_entry(
             client,
