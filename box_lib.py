@@ -91,7 +91,6 @@ def fetch_entry(
 
     if not manager:
         return None
-    print(manager)
 
     funcs = {
         "info": getattr(manager, f"get_{entry_type}_by_id"),
@@ -164,7 +163,9 @@ def create_box_folder(
             )
 
         if target:
-            display_message("SUCCESS", f'New folder "{target_name}" created.')
+            display_message(
+                "SUCCESS", f'New folder "{target_name}" created (ID : {target.id}).'
+            )
 
     except Exception as e:
         display_message("ERROR", f'Failed to create "{target_name}" in parent.', f"{e}")
@@ -252,10 +253,20 @@ def move_box_entry(client: BoxClient, entry_url: str, default_loc: bool):
 #         )
 
 
-def ensure_box_path_exists(client: BoxClient, parent_url: str, target_name: str) -> str:
+def ensure_box_folder_exists(
+    client: BoxClient, parent_identifier: str, target_name: str
+) -> str:
+    """
+    parent_identifier : could be ULR or ID; URL preferred.
+    """
+    parent_url = parent_identifier  # Default to URL as identifier.
     _, parent_id = extract_entry_meta(parent_url)
+
+    if not parent_id:
+        parent_url = parse_box_url("folder", parent_identifier)
+
     display_message(
-        "INFO", f'Checking folder " {target_name} " in parent (ID : {parent_id}) ... '
+        "INFO", f'Checking folder "{target_name}" in parent (ID : {parent_id}) ... '
     )
     display_box_path(client, parent_url)
 
@@ -269,18 +280,15 @@ def ensure_box_path_exists(client: BoxClient, parent_url: str, target_name: str)
 
             if target:
                 display_message(
-                    "INFO", f'Folder " {target_name} " already exists in parent.'
+                    "INFO", f'Folder "{target_name}" already exists in parent.'
                 )
                 target_id = target[0].id
             else:
-                display_message(
-                    "WARN", f'Folder " {target_name} " not found in parent.'
-                )
+                display_message("WARN", f'Folder "{target_name}" not found in parent.')
         else:
-            display_message("WARN", f'Folder " {target_name} " not found in parent.')
+            display_message("WARN", f'Folder "{target_name}" not found in parent.')
 
         if not target_id:
-            print(f'>>> Creating " {target_name} " in parent ... ')
             target = create_box_folder(client, parent_url, target_name)
 
             if target:
@@ -289,7 +297,7 @@ def ensure_box_path_exists(client: BoxClient, parent_url: str, target_name: str)
     except Exception as e:
         display_message(
             "ERROR",
-            f'Failed to verify presence and/or create " {target_name} " in parent.',
+            f'Failed to verify presence and/or create "{target_name}" in parent.',
             f"{e}",
         )
 
@@ -308,13 +316,15 @@ def get_box_entries(client: BoxClient, folder_url: str) -> list[Item]:
         box_items = client.folders.get_folder_items(folder_id)
         box_entries = box_items.entries
         entries_count = box_items.total_count or 0
+        disp_stat = "WARN"
         disp_msg_i = "No entries found on"
 
         if entries_count:
+            disp_stat = "INFO"
             disp_msg_i = f"Total of {entries_count} item{'s' if entries_count > 1 else ''} retrieved from"
 
         display_message(
-            "SUCCESS",
+            disp_stat,
             f"{disp_msg_i} folder (ID : {folder_id}) .",
         )
 
@@ -326,3 +336,7 @@ def get_box_entries(client: BoxClient, folder_url: str) -> list[Item]:
         )
 
         return []
+
+
+def parse_box_url(entry_type: str, entry_id: str) -> str:
+    return f"https://app.box.com/{entry_type}/{entry_id}"
