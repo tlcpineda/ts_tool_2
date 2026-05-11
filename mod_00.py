@@ -18,7 +18,6 @@ from lib import (
     load_proj_cache,
     parse_pathname,
     rename_path,
-    show_proj_in_cache,
     show_table,
     welcome_sequence,
     write_to_csv,
@@ -248,8 +247,7 @@ def verify_contents_ref_folder(
 def gen_pagination() -> tuple[list[list[str]], str, str, str]:
     try:
         cache = load_proj_cache(PROJ_CACHE)
-
-        work_id, proj_name, title_en, vol_num, _ = get_term_details(cache)
+        work_id, proj_name, title_en, vol_num, _, _ = get_term_details(cache)
         title_vol = f"{title_en}_{int(vol_num):03}"
 
         print(f"\n<=> Generating pagination data for ' {title_vol} ' ... ")
