@@ -39,9 +39,11 @@ def init_client() -> BoxClient | None:
                 display_message("WARN", "Process terminated.")
                 return None
             else:
-                display_message("INFO", f"Token input : {token}")
+                display_message("INFO", "Creating BoxClient object ... ")
 
         client = BoxClient(auth=BoxDeveloperTokenAuth(token))
+
+        display_message("SUCCESS", "BoxClient object created.")
 
         return client
 
@@ -198,9 +200,9 @@ def rename_box_entry(client: BoxClient, entry_url: str, new_entry_name: str):
 def move_box_entry(client: BoxClient, entry_url: str, default_loc: bool):
     # Move entry one level up within path_collection; index -2 of path collection
     move_up_one = -2
-    entry_type, entry_id = extract_entry_meta(entry_url)
     new_parent_id = ""
     dest_url = ""
+    entry_type, entry_id = extract_entry_meta(entry_url)
 
     try:
         params = [
@@ -234,23 +236,45 @@ def move_box_entry(client: BoxClient, entry_url: str, default_loc: bool):
         )
 
 
-# def copy_box_entry(client: BoxClient, entry_url: str):
-#     entry_type, entry_id = extract_entry_meta(entry_url)
-#     new_parent_id = ""
-#     dest_url = ""
+def copy_box_entry(client: BoxClient, entry_url: str, dest_url: str) -> str:
+    entry_type, entry_id = extract_entry_meta(entry_url)
+    dest_type, dest_id = extract_entry_meta(dest_url)
 
-#     try:
-#         params = [
-#             ("info", lambda: {}),
-#             ("copy", lambda: {"parent": {"id": new_parent_id}}),
-#         ]
+    dest = fetch_entry(client, dest_url, ("info", {}))
 
-#         # somethng else here
+    if dest_type != "folder" or not dest:
+        display_message("ERROR", "Invalid destination URL.")
+        return ""
 
-#     except Exception as e:
-#         display_message(
-#             "ERROR", f"Failed to copy {entry_type} (ID : {entry_id}).", f"{e}"
-#         )
+    try:
+        params = [
+            ("info", {}),
+            ("copy", {"parent": {"id": dest_id}}),
+        ]
+
+        display_message("INFO", f"Copying {entry_type} ... ")
+
+        for param in params:
+            entry = fetch_entry(client, entry_url, param)
+
+            if entry:
+                entry_id = entry.id
+                entry_type = entry.type.lower()
+                entry_url = parse_box_url(entry_type, entry_id)
+
+            display_box_path(client, entry_url)
+
+        display_message(
+            "SUCCESS", f"{entry_type.title()} copied to destination folder."
+        )
+        return entry_url
+
+    except Exception as e:
+        display_message(
+            "ERROR", f"Failed to copy {entry_type} (ID : {entry_id}).", f"{e}"
+        )
+
+        return ""
 
 
 def ensure_box_folder_exists(
