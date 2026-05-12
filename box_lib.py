@@ -278,7 +278,7 @@ def copy_box_entry(client: BoxClient, entry_url: str, dest_url: str) -> str:
 
 
 def ensure_box_folder_exists(
-    client: BoxClient, parent_identifier: str, target_name: str
+    client: BoxClient, parent_identifier: str, folder_name: str
 ) -> str:
     """
     parent_identifier : could be ULR or ID; URL preferred.
@@ -289,43 +289,68 @@ def ensure_box_folder_exists(
     if not parent_id:
         parent_url = parse_box_url("folder", parent_identifier)
 
-    display_message(
-        "INFO", f'Checking folder "{target_name}" in parent (ID : {parent_id}) ... '
-    )
-    display_box_path(client, parent_url)
-
-    target_id = ""
+    target = None
 
     try:
-        children = get_box_entries(client, parent_url)
+        target = find_box_entry_by_name(client, parent_url, "folder", folder_name)
 
-        if children:
-            target = [child for child in children if child.name == target_name]
+        if not target:
+            target = create_box_folder(client, parent_url, folder_name)
 
-            if target:
-                display_message(
-                    "INFO", f'Folder "{target_name}" already exists in parent.'
-                )
-                target_id = target[0].id
-            else:
-                display_message("WARN", f'Folder "{target_name}" not found in parent.')
-        else:
-            display_message("WARN", f'Folder "{target_name}" not found in parent.')
-
-        if not target_id:
-            target = create_box_folder(client, parent_url, target_name)
-
-            if target:
-                target_id = target.id
+        return target.id if target else ""
 
     except Exception as e:
         display_message(
             "ERROR",
-            f'Failed to verify presence and/or create "{target_name}" in parent.',
+            f'Failed to verify presence and/or create "{folder_name}" in parent.',
             f"{e}",
         )
 
-    return target_id
+        return ""
+
+
+def find_box_entry_by_name(
+    client: BoxClient, parent_url: str, entry_type: str, entry_name: str
+) -> Item | None:
+    """
+    entry_name: Case-sensitive, including extension name for the case of "file" entries.
+    """
+
+    def disp_msg(state: bool) -> None:
+        disp_stat = "INFO" if state else "WARN"
+        disp_msg = f'{entry_type.title()} entry "{entry_name}" {"" if state else "not "}found in parent.'
+
+        display_message(disp_stat, disp_msg)
+
+    _, parent_id = extract_entry_meta(parent_url)
+    entry_type = entry_type.lower()
+
+    display_message(
+        "INFO",
+        f'Checking for {entry_type} "{entry_name}" in parent (ID : {parent_id}) ... ',
+    )
+    display_box_path(client, parent_url)
+
+    entry = None
+
+    try:
+        # Get children of parent folder; check if target entry is one of the children.
+        children = get_box_entries(client, parent_url)
+
+        if children:
+            entry0 = [
+                child
+                for child in children
+                if (child.name == entry_name and child.type == entry_type)
+            ]
+            entry = entry0[0] if entry0 else None
+
+        disp_msg(bool(entry))
+
+    except Exception as e:
+        display_message("ERROR", f'Failed to find "{entry_name}" in parent.', f"{e}")
+
+    return entry
 
 
 def get_path_entries(entry: FolderFull | FileFull) -> list[FolderMini]:
