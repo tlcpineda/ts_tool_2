@@ -1,13 +1,16 @@
 import os
 import time
 
+from box_sdk_gen.schemas import folder
 from dotenv import load_dotenv
 
 from box_lib import (
+    copy_box_entry,
     display_box_path,
     ensure_box_folder_exists,
     extract_entry_meta,
     fetch_entry,
+    find_box_entry_by_name,
     get_box_entries,
     init_client,
     move_box_entry,
@@ -55,89 +58,100 @@ def prefix_lang_code():
         return
 
     while True:
-        parent_url = input(
-            "\n>>> Input URL of folder to be processed ('Q' to quit) : "
+        parent_urls = input(
+            '\n>>> Input URL(s) of folder(s), comma-separated, to be processed ("Q" to quit) : '
         ).strip()
 
-        if not parent_url:
+        if not parent_urls:
             display_message("WARN", "No URL input.")
             continue
 
-        if parent_url.upper() == "Q":
+        parents_split = [url.strip() for url in parent_urls.split(",")]
+
+        if parent_urls[0].upper() == "Q":
             display_message("WARN", "Terminating process.")
             break
 
-        parent_type, parent_id = extract_entry_meta(parent_url)
+        len_parents_split = len(parents_split)
 
-        if not parent_id or parent_type != "folder":
-            display_message("ERROR", "Invalid Box folder URL.")
-            continue
+        for parent_index, parent_u in enumerate(parents_split):
+            parent_type, parent_id = extract_entry_meta(parent_u)
 
-        try:
-            parent = fetch_entry(client, parent_url, ("info", {}))
-
-            if not parent:
-                display_message("ERROR", "Invalid Box folder URL.")
-
-            hor_bar(100)
-            display_message("INFO", f"Processing folder (ID : {parent_id})")
-            display_box_path(client, parent_url)
-
-            folder_entries = get_box_entries(client, parent_url)
-            target_names = ["JPEG", "PSD", "JPG"]
-
-            target_folders = [
-                entry
-                for entry in folder_entries
-                if (entry.name or "").upper() in target_names and entry.type == "folder"
-            ]
-
-            len_targets = len(target_folders)
-
-            if not len_targets:
-                display_message(
-                    "ERROR",
-                    f"Subfolders 'JPEG' and 'PSD'  not found in folder (ID : {parent_id}).",
-                )
+            if not parent_id or parent_type != "folder":
+                display_message("ERROR", "Invalid URL input.")
                 continue
 
-            for folder_index, folder in enumerate(folder_entries):
+            try:
+                parent = fetch_entry(client, parent_u, ("info", {}))
+
+                if not parent:
+                    display_message("ERROR", "Invalid Box folder URL.")
+
+                hor_bar(100)
                 display_message(
                     "INFO",
-                    f'Processing folder " {folder.name} " ({folder_index + 1} / {len_targets}) ... ',
+                    f"Processing folder (ID : {parent_id}) ({parent_index + 1} / {len_parents_split}) ... ",
                 )
+                display_box_path(client, parent_u)
 
-                subfolder_url = parse_box_url("folder", folder.id)
-                subfolder_entries = get_box_entries(client, subfolder_url)
-                len_sub_entries = len(subfolder_entries)
+                folder_entries = get_box_entries(client, parent_u)
+                target_names = ["JPEG", "PSD", "JPG"]
 
-                if not len_sub_entries:
+                target_folders = [
+                    entry
+                    for entry in folder_entries
+                    if (entry.name or "").upper() in target_names
+                    and entry.type == "folder"
+                ]
+
+                len_targets = len(target_folders)
+
+                if not len_targets:
+                    display_message(
+                        "ERROR",
+                        f'Subfolders "JPEG" and "PSD"  not found in folder (ID : {parent_id}).',
+                    )
                     continue
 
-                for entry_i, entry in enumerate(subfolder_entries):
+                for folder_index, folder in enumerate(folder_entries):
                     display_message(
                         "INFO",
-                        f"Processing '{entry.name}' ({entry_i + 1} / {len_sub_entries}) ... ",
+                        f'Processing folder "{folder.name}" ({folder_index + 1} / {len_targets}) ... ',
                     )
 
-                    if entry.type == "file":
-                        if (entry.name or "").startswith(lang_iso_2):
-                            print("<=>  Skip file.")
-                        else:
-                            file_url = parse_box_url("file", entry.id)
+                    subfolder_url = parse_box_url("folder", folder.id)
+                    subfolder_entries = get_box_entries(client, subfolder_url)
+                    len_sub_entries = len(subfolder_entries)
 
-                            rename_box_entry(
-                                client, file_url, f"{lang_iso_2}_{entry.name}"
-                            )
+                    if not len_sub_entries:
+                        continue
 
-                    box_delay(1)  # 1-sec delay between files.
-                hor_bar(100)
-                box_delay(3)  # 3-sec delay between folders.
-            break
+                    for entry_i, entry in enumerate(subfolder_entries):
+                        display_message(
+                            "INFO",
+                            f'Processing "{entry.name}" ({entry_i + 1} / {len_sub_entries}) ... ',
+                        )
 
-        except Exception as e:
-            display_message("ERROR", "Failed to append language code to files.", f"{e}")
-            break
+                        if entry.type == "file":
+                            if (entry.name or "").startswith(lang_iso_2):
+                                print("<=>  Skip file.")
+                            else:
+                                file_url = parse_box_url("file", entry.id)
+
+                                rename_box_entry(
+                                    client, file_url, f"{lang_iso_2}_{entry.name}"
+                                )
+
+                        box_delay(1)  # 1-sec delay between files.
+                    hor_bar(100)
+                    box_delay(1)  # 2-sec delay between folders.
+
+            except Exception as e:
+                display_message(
+                    "ERROR", "Failed to append language code to files.", f"{e}"
+                )
+                break
+        break
 
 
 def move_pdf():
@@ -221,15 +235,16 @@ def move_pdf():
 
 def create_term_tree() -> dict[str, str]:
     chapter_urls = {}
-    # parent_url = TS_PARENT
-    parent_url = "https://app.box.com/folder/0"
+    parent_url = TS_PARENT
     client = init_client()
-    cache = load_proj_cache(PROJ_CACHE)
-    _, proj_name, title_en, _, term, ch = get_term_details(cache)
 
     if not client:
         display_message("ERROR", "Failed to create BoxClient object.")
         return {}
+
+    cache = load_proj_cache(PROJ_CACHE)
+    _, proj_name, title_en, _, term, ch = get_term_details(cache)
+    box_delay(2)
 
     try:
         for branch_name in [term, proj_name, ch]:
@@ -263,6 +278,59 @@ def create_term_tree() -> dict[str, str]:
     except Exception as e:
         display_message("ERROR", "Failed to create term tree in Box.", f"{e}")
         return {}
+
+
+def copy_ts_files():
+    """
+    Copy latest revision typesetting files (PDF/JPEG)
+    where chapter has no client feedback/request for revisions.
+    """
+    client = init_client()
+    cache = load_proj_cache(PROJ_CACHE)
+    source_parent = TS_PARENT
+    dest_parent = CR_PARENT
+    sources = {}
+
+    _, proj_name, _, _, term, ch = get_term_details(cache)
+
+    if not client:
+        display_message("ERROR", "Failed to create BoxClient object.")
+        return
+
+    try:
+        # Find folders (IDs) containing files to be copied (by chapter) from Typesetting folder;
+        # and, the folder (ID) where the files are to be sent revisions folder.
+        for folder_name in [term, proj_name, ch]:
+            if isinstance(folder_name, str):
+                source = find_box_entry_by_name(
+                    client, source_parent, "folder", folder_name
+                )
+
+                if source:  # source becomes source_parent.
+                    source_parent = parse_box_url("folder", source.id)
+
+                # Assign new destination parent; create new, when required.
+                dest_id = ensure_box_folder_exists(client, dest_parent, folder_name)
+                dest_parent = parse_box_url("folder", dest_id)
+
+            elif isinstance(folder_name, list):
+                for sibling in folder_name:
+                    source = find_box_entry_by_name(
+                        client, source_parent, "folder", sibling
+                    )
+
+                    if source:
+                        source_id = source.id
+                        sources[sibling] = parse_box_url("folder", source_id)
+
+        # Copy source folders to destination.
+        for ch, url in sources.items():
+            hor_bar(100)
+            box_delay(1)  # 2-sec delay between sources
+            copy_box_entry(client, url, dest_parent)
+
+    except Exception as e:
+        display_message("ERROR", f"Failed to copy typesetting files.{e}")
 
 
 if __name__ == "__main__":
