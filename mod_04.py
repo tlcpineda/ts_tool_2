@@ -29,8 +29,8 @@ from lib import (
 
 # Module variables
 mod_name = "Box API Operations"
-mod_ver = "1"
-date = "09 May 2026"
+mod_ver = "2"
+date = "15 May 2026"
 email = "tlcpineda.projects@gmail.com"
 lang_iso_2 = "en"
 
@@ -350,6 +350,7 @@ if __name__ == "__main__":
                 "\n>>>  Rename [B]ox files (EN) ?"
                 "\n>>>  [M]ove PDF files to term folder ?"
                 "\n>>>  [C]reate typesetting term folder ?"
+                "\n>>>  Copy [T]ypesetting files to Revisions folder ?"
                 "\n>>>  E[X]it and close this window ?"
             )
 
@@ -367,8 +368,11 @@ if __name__ == "__main__":
             if resp == "B":
                 prefix_lang_code()
 
-            if resp == "M":
+            elif resp == "M":
                 move_pdf()
 
-            if resp == "C":
+            elif resp == "C":
                 create_term_tree()
+
+            elif resp == "T":
+                copy_ts_files()

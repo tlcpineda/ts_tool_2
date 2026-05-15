@@ -1,17 +1,19 @@
 """
-A compilation of modules to assist in local processes during typesetting.
+A compilation of modules to assist in local processes during typesetting,
+and some Box API operations.
 """
 
 from lib import display_message, hor_bar, welcome_sequence
-from mod_00 import pre_lang, pre_lang_box, prepare_files
+from mod_00 import pre_lang, prepare_files
 from mod_01A import create_pre_csv
 from mod_01B import finalise_csv
 from mod_03 import compile_revision
+from mod_04 import copy_ts_files, create_term_tree, move_pdf, prefix_lang_code
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "3.03.00"
-date = "29 Apr 2026"
+app_ver = "4.00.00"
+date = "15 May 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
     {
@@ -23,11 +25,6 @@ options = [
         "menu": "Prefix [L]anguage code",
         "shortkey": "L",
         "func": pre_lang,
-    },
-    {
-        "menu": "Rename files in [B]ox",
-        "shortkey": "B",
-        "func": pre_lang_box,
     },
     {
         "menu": "[S]crape translations",
@@ -43,6 +40,26 @@ options = [
         "menu": "Compile [R]evision files",
         "shortkey": "R",
         "func": compile_revision,
+    },
+    {
+        "menu": "Rename files in [B]ox",
+        "shortkey": "B",
+        "func": prefix_lang_code,
+    },
+    {
+        "menu": "[M]ove PDF files to term folder",
+        "shortkey": "M",
+        "func": move_pdf,
+    },
+    {
+        "menu": "[C]reate typesetting term folder",
+        "shortkey": "C",
+        "func": create_term_tree,
+    },
+    {
+        "menu": "Copy [T]ypesetting files to Revisions folder",
+        "shortkey": "T",
+        "func": copy_ts_files,
     },
     {"menu": "E[X]it and close window", "shortkey": "X"},
 ]
