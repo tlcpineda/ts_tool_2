@@ -13,7 +13,7 @@ from box_sdk_gen import (
 )
 from dotenv import load_dotenv
 
-from lib import display_message
+from lib import display_message, display_path_desc
 
 # Load .env file.
 load_dotenv()
@@ -78,6 +78,10 @@ def extract_entry_meta(entry_url: str) -> tuple[str, str]:
             entry_id = entry_id.split("?")[0]
 
     return entry_type, entry_id
+
+
+def parse_box_url(entry_type: str, entry_id: str) -> str:
+    return f"https://app.box.com/{entry_type}/{entry_id}"
 
 
 def fetch_entry(
@@ -277,11 +281,43 @@ def copy_box_entry(client: BoxClient, entry_url: str, dest_url: str) -> str:
         return ""
 
 
+def dl_box_entry(client: BoxClient, entry_id: str, dl_to_path: str) -> bool:
+    """
+    :param entry_id: ID of the entry to be downloaded.
+    future to include download of folders and its contents
+    """
+    try:
+        box_stream = client.downloads.download_file(entry_id)
+        # display_message("INFO", f"Downloading file (ID : {entry_id}) ... ")
+
+        if not box_stream:
+            raise Exception("Box API issue client.downloads.download_file().")
+
+        with open(dl_to_path, "wb") as local_file:
+            chunk_size = 65536
+
+            while True:
+                chunk = box_stream.read(chunk_size)
+
+                if not chunk:
+                    break
+
+                local_file.write(chunk)
+
+        display_message("INFO", "Download complete.")
+        display_path_desc(dl_to_path, "file")
+        return True
+
+    except Exception as e:
+        display_message("ERROR", f"Failed to download file (ID : {entry_id})", f"{e}")
+        return False
+
+
 def ensure_box_folder_exists(
     client: BoxClient, parent_identifier: str, folder_name: str
 ) -> str:
     """
-    parent_identifier : could be ULR or ID; URL preferred.
+    parent_identifier : could be URL or ID; URL preferred.
     """
     parent_url = parent_identifier  # Default to URL as identifier.
     _, parent_id = extract_entry_meta(parent_url)
@@ -313,7 +349,9 @@ def find_box_entry_by_name(
     client: BoxClient, parent_url: str, entry_type: str, entry_name: str
 ) -> Item | None:
     """
-    entry_name: Case-sensitive, including extension name for the case of "file" entries.
+    :param parent_url: URL of the folder containing the item.
+    :param entry_type: Either "folder" or "file".
+    :param entry_name: Case-sensitive, including extension name for the case of "file" entries.
     """
 
     def disp_msg(state: bool) -> None:
@@ -385,7 +423,3 @@ def get_box_entries(client: BoxClient, folder_url: str) -> list[Item]:
         )
 
         return []
-
-
-def parse_box_url(entry_type: str, entry_id: str) -> str:
-    return f"https://app.box.com/{entry_type}/{entry_id}"
