@@ -347,7 +347,7 @@ def show_proj_in_cache(cache: list) -> None:
     show_table(table_title, col_widths, heads, table)
 
 
-def load_proj_cache(cache_path) -> LogManager:
+def load_proj_cache(cache_path: str) -> LogManager:
     display_message("INFO", "Loading project cache ... ")
     display_path_desc(cache_path, "file")
 
@@ -403,36 +403,23 @@ def parse_chapters(ch_in: str) -> list[str] | None:
     return sorted(list(set(ch_list)))
 
 
-def get_term_details(
-    cache: LogManager,
-) -> tuple[str, str, str, str, str, list[str]]:
-
+def get_cached_proj_details(cache: LogManager) -> dict:
     proj_det = {}
-    lit_id = ""
-    title_en = ""
-    vol_num = ""
-    term = ""
-    chapters = []
-
+    work_id = ""
+    resp = False
     projects = cache.load()
     work_ids = [proj["work_id"] for proj in projects]
-
-    resp = False
-    work_id = ""
 
     show_proj_in_cache(projects)
     while not resp:
         work_id = input(
-            "\n>>> Enter 'Work ID' to select project (or '0' for a new project) : "
+            '\n>>> Enter "Work ID" to select project (or "0" for a new project) : '
         ).strip()
 
         if work_id in work_ids or work_id == "0":
             resp = True
         else:
-            display_message(
-                "WARN",
-                f"'{work_id}' is not a valid input.",
-            )
+            display_message("WARN", f'"{work_id}" is not a valid input.')
 
     if int(work_id):
         # Extract project details based on work_id (ultimately from index of the project on the cache).
@@ -440,15 +427,36 @@ def get_term_details(
         proj_det = cache.__getitem__(proj_index)
         display_message("INFO", "Project selected from cache.")
 
-    else:
+    else:  # work_id == 0; input new project details.
+        # TODO loop system to be able to edit input if needed.
         proj_det = get_proj_details()  # Get details as user input.
+        work_id = proj_det["work_id"]
         cache.add(proj_det)
+        display_message("INFO", "New project details added to cache.")
 
-    lit_id = proj_det["lit_id"]
+    print(
+        f"<=>  #{work_id} LIT{int(proj_det['lit_id']):03} {proj_det['title_jp']} ( {proj_det['title_en']} )"
+    )
+
+    return proj_det
+
+
+def get_term_details(
+    cache: LogManager,
+) -> tuple[str, str, str, str, str, list[str]]:
+    """
+    Get details for the term from user input.
+    :param cache:
+    :return work_id, proj_name, title_en, vol_num, term, chapters:
+    """
+    vol_num = ""
+    term = ""
+    chapters = []
+
+    proj_det = get_cached_proj_details(cache)
+    work_id = proj_det["work_id"]
     title_en = proj_det["title_en"]
-    proj_name = f"LIT{int(lit_id):03} {proj_det['title_jp']}"
-
-    print(f"<=>  #{work_id} {proj_name} ( {title_en} )")
+    proj_name = f"LIT{int(proj_det['lit_id']):03} {proj_det['title_jp']}"
 
     vol_num = input("\n>>> Enter volume number : ").strip()
     vol_num, _ = clean_number(vol_num)
