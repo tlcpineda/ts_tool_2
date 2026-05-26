@@ -8,12 +8,18 @@ from mod_00 import pre_lang, prepare_files
 from mod_01A import create_pre_csv
 from mod_01B import finalise_csv
 from mod_03 import compile_revision
-from mod_04 import copy_ts_files, create_term_tree, move_pdf, prefix_lang_code
+from mod_04 import (
+    copy_ts_files,
+    create_term_tree,
+    fetch_client_cr,
+    move_pdf,
+    prefix_lang_code,
+)
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "4.00.00"
-date = "15 May 2026"
+app_ver = "5.00.00"
+date = "27 May 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
     {
@@ -55,6 +61,11 @@ options = [
         "menu": "[C]reate typesetting term folder",
         "shortkey": "C",
         "func": create_term_tree,
+    },
+    {
+        "menu": "F[E]tch revision file/tab",
+        "shortkey": "E",
+        "func": fetch_client_cr,
     },
     {
         "menu": "Copy [T]ypesetting files to Revisions folder",

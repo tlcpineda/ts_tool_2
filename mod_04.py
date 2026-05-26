@@ -1,12 +1,14 @@
 import os
 import time
+from datetime import datetime
 
-from box_sdk_gen.schemas import folder
+import win32com.client as win32
 from dotenv import load_dotenv
 
 from box_lib import (
     copy_box_entry,
     display_box_path,
+    dl_box_entry,
     ensure_box_folder_exists,
     extract_entry_meta,
     fetch_entry,
@@ -19,10 +21,13 @@ from box_lib import (
 )
 from lib import (
     display_message,
+    display_path_desc,
     expand_path,
+    get_cached_proj_details,
     get_term_details,
     hor_bar,
     load_proj_cache,
+    parse_pathname,
     show_table,
     welcome_sequence,
 )
@@ -39,6 +44,8 @@ load_dotenv()
 PROJ_CACHE = expand_path(os.getenv("PROJ_CACHE", ""))
 TS_PARENT = os.getenv("TS_PARENT", "")
 CR_PARENT = os.getenv("CR_PARENT", "")
+CR_FEEDBACK = os.getenv("CR_FEEDBACK", "")
+PARENT_LOCAL = expand_path(os.getenv("PARENT_LOCAL", ""))
 
 
 def box_delay(sec: int) -> None:
@@ -286,6 +293,11 @@ def copy_ts_files():
     where chapter has no client feedback/request for revisions.
     """
     client = init_client()
+
+    # Terminate process when BoxClient is not created.
+    if not client:
+        return
+
     cache = load_proj_cache(PROJ_CACHE)
     source_parent = TS_PARENT
     dest_parent = CR_PARENT
@@ -333,6 +345,113 @@ def copy_ts_files():
         display_message("ERROR", f"Failed to copy typesetting files.{e}")
 
 
+def fetch_client_cr() -> None:
+    def get_range_from_name(entry_name) -> range:
+        id_range = range(0)
+
+        base, _ = os.path.splitext(entry_name)
+        str_range = base.split("No.")[1]
+
+        i, o = str_range.split("-")
+
+        id_range = range(int(i), int(o) + 1)
+
+        return id_range
+
+    try:
+        client = init_client()
+
+        # Terminate process if BoxClient is not created.
+        if not client:
+            return None
+
+        proj_cache = load_proj_cache(PROJ_CACHE)
+        proj_det = get_cached_proj_details(proj_cache)
+        work_id = proj_det["work_id"]
+        title_jp = proj_det["title_jp"]
+
+        feedback_files = get_box_entries(client, CR_FEEDBACK)
+        req_file_id = ""
+
+        for item in feedback_files:
+            item_name = item.name or ""
+
+            if "No." not in item_name:
+                continue
+
+            work_id_range = get_range_from_name(item_name)
+
+            if int(work_id) in work_id_range:
+                req_file_id = item.id
+
+                display_message("SUCCESS", "Required Client CR file identified.")
+                display_box_path(client, parse_box_url("file", req_file_id))
+                break
+
+        if not req_file_id:
+            raise Exception("Failed to identify required file.")
+
+        dl_name = f"{datetime.now().strftime('%Y%m%d')} CR - {work_id}"
+        display_message(
+            "INFO",
+            f'Downloading required file as "{dl_name}.xlsx" ... ',
+        )
+
+        dl_dest_path = parse_pathname(PARENT_LOCAL, dl_name, "xlsx", "file")
+        dl_stat = dl_box_entry(client, req_file_id, dl_dest_path)
+
+        if dl_stat:
+            purge_xlsx(dl_dest_path, title_jp, work_id)
+
+    except Exception as e:
+        display_message("ERROR", "Failed to fetch CR file.", f"{e}")
+
+
+def purge_xlsx(xlsx_path: str, tab_name: str, work_id: str):
+    """
+    Open a local Excel file natively through Windows COM.
+    Keep first two tabs and the project tab,
+    and delete all other tabs.
+    """
+    excel_app = win32.Dispatch("Excel.Application")
+    excel_app.Visible = False
+    excel_app.DisplayAlerts = False
+
+    display_message("INFO", "Purging Client CR file ... ")
+    _, base = display_path_desc(xlsx_path, "file")
+
+    try:
+        workbook = excel_app.Workbooks.Open(
+            Filename=xlsx_path, CorruptLoad=win32.constants.xlRepairFile
+        )
+
+        # Delete the unnecessary tabs. Loop backwards; prevents index shift.
+        for i in range(len(workbook.Sheets), 2, -1):
+            sheet = workbook.Sheets(i)
+            sheetname = sheet.Name
+
+            if sheetname == tab_name:
+                display_message("INFO", f"Project sheet encountered ( {sheetname} ).")
+                sheet.Name = f"{work_id}. {sheetname}"
+                display_message("INFO", "Sheet renamed.")
+            else:
+                display_message("INFO", f"Deleting sheet : {sheetname} ... ")
+                sheet.Delete()
+                # shell.SendKeys("{ENTER}")
+                display_message("SUCCESS", "Sheet deleted.")
+
+        # Save the changes back to the original file.
+        workbook.SaveAs(Filename=xlsx_path)
+        workbook.Close()
+        display_message("SUCCESS", f"Client CR file ( {base} ) purged.")
+
+    except Exception as e:
+        display_message("ERROR", f"Failed to purge client CR file ( {base} ).", f"{e}")
+
+    finally:
+        excel_app.Quit()
+
+
 if __name__ == "__main__":
     welcome_sequence([mod_name, f"ver {mod_ver} {date}", email])
 
@@ -350,6 +469,7 @@ if __name__ == "__main__":
                 "\n>>>  Rename [B]ox files (EN) ?"
                 "\n>>>  [M]ove PDF files to term folder ?"
                 "\n>>>  [C]reate typesetting term folder ?"
+                "\n>>>  F[E]tch revision file/tab ?"
                 "\n>>>  Copy [T]ypesetting files to Revisions folder ?"
                 "\n>>>  E[X]it and close this window ?"
             )
@@ -376,3 +496,6 @@ if __name__ == "__main__":
 
             elif resp == "T":
                 copy_ts_files()
+
+            elif resp == "E":
+                fetch_client_cr()
