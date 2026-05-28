@@ -493,13 +493,13 @@ def get_term_details(
     hor_bar(100)
 
     show_table(
-        "Input Summary",
+        "Output Summary",
         [
             3,
             16,
             max(40, min(len(f"{chapters}"), 81)),
         ],
-        ["", "Parameters", "Input Value(s)"],
+        ["", "Parameters", "Values"],
         [
             ["1", "Work ID", work_id],
             ["2", "Project Name", proj_name],

@@ -22,6 +22,7 @@ from lib import (
     welcome_sequence,
     write_to_csv,
 )
+from mod_04 import fetch_data_files
 
 # Module variables
 mod_name = "Preliminary Administrative Works"
@@ -61,7 +62,7 @@ load_dotenv()
 SRC_WEBAPP = os.getenv("WEBAPP", "")
 BOX_DEV_CONSOLE = os.getenv("BOX_DEV_CONSOLE", "")
 PROJ_CACHE = expand_path(os.getenv("PROJ_CACHE", ""))
-PROJ_DIR = expand_path(os.getenv("PARENT_LOCAL", ""))
+PARENT_LOCAL = expand_path(os.getenv("PARENT_LOCAL", ""))
 
 
 def prepare_files() -> None:
@@ -78,7 +79,7 @@ def prepare_files() -> None:
         # List of referene JPEG files.
         jpg_filenames = [f"{row[3]}.jpg" for row in pagination_data if row[6] == "—"]
 
-        print("\n>>> Identify folders containing reference files ...")
+        print("\n>>> Process folders containing reference files.")
 
         psd_files_dir, psd_num_missing = verify_contents_ref_folder(
             psd_filenames, "Typesetting files (PSD)"
@@ -102,7 +103,7 @@ def prepare_files() -> None:
 
         # Sorting files.
         # Parent of both chapter working files, and reference files.
-        proj_parent = parse_pathname(PROJ_DIR, proj_name, "", "folder")
+        proj_parent = parse_pathname(PARENT_LOCAL, proj_name, "", "folder")
 
         # Parse parent directory local destination of reference files.
         # to be appended by chapter folders.
@@ -255,7 +256,9 @@ def gen_pagination() -> tuple[list[list[str]], str, str, str]:
         csv_data = []
 
         # Check if CSV file exists from previous run.
-        csv_path = os.path.join(PROJ_DIR, proj_name, f"{csv_name_pre} {title_vol}.csv")
+        csv_path = os.path.join(
+            PARENT_LOCAL, proj_name, f"{csv_name_pre} {title_vol}.csv"
+        )
 
         if os.path.exists(csv_path):
             display_message("INFO", "Pagination data loaded from CSV file ... ")

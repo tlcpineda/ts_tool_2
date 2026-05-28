@@ -4,6 +4,7 @@ from box_sdk_gen import (
     BoxClient,
     BoxDeveloperTokenAuth,
     CreateFolderParent,
+    CreateZipDownloadItemsTypeField,
     FileFull,
     FilesManager,
     FolderFull,
@@ -11,6 +12,7 @@ from box_sdk_gen import (
     FoldersManager,
     Item,
 )
+from box_sdk_gen.managers.zip_downloads import CreateZipDownloadItems
 from dotenv import load_dotenv
 
 from lib import display_message, display_path_desc
@@ -27,7 +29,7 @@ def init_client() -> BoxClient | None:
 
         print("\n<=> Generate token at : ")
         print(f"\n      {BOX_DEV_CONSOLE}")
-        input("\n>>> Press enter to continue ... ")
+        input("\n>>> Press ENTER to continue ... ")
 
         # Input Box Developer Console token.
         while not token:
@@ -39,11 +41,11 @@ def init_client() -> BoxClient | None:
                 display_message("WARN", "Process terminated.")
                 return None
             else:
-                display_message("INFO", "Creating BoxClient object ... ")
+                display_message("INFO", "Creating Box client ... ")
 
         client = BoxClient(auth=BoxDeveloperTokenAuth(token))
 
-        display_message("SUCCESS", "BoxClient object created.")
+        display_message("SUCCESS", "Box client created.")
 
         return client
 
@@ -66,6 +68,9 @@ def init_mngr(
 
 
 def extract_entry_meta(entry_url: str) -> tuple[str, str]:
+    """
+    :return : entry_type, entry_id
+    """
     entry_type = ""
     entry_id = ""
 
@@ -281,34 +286,65 @@ def copy_box_entry(client: BoxClient, entry_url: str, dest_url: str) -> str:
         return ""
 
 
-def dl_box_entry(client: BoxClient, entry_id: str, dl_to_path: str) -> bool:
+def dl_box_entry(
+    client: BoxClient, entry_id: str | list[tuple[str, str]], dl_to_path: str
+) -> bool:
     """
-    :param entry_id: ID of the entry to be downloaded.
-    future to include download of folders and its contents
+    :param entry_id: ID of the entry to be downloaded; or list of tuple (ID, entry type) of entries to be downloaded
     """
     try:
-        box_stream = client.downloads.download_file(entry_id)
+        box_stream = None
 
-        if not box_stream:
-            raise Exception("Box API issue client.downloads.download_file().")
+        if isinstance(entry_id, str):
+            box_stream = client.downloads.download_file(entry_id)
 
-        with open(dl_to_path, "wb") as local_file:
-            chunk_size = 65536
+        elif isinstance(entry_id, list):
+            items = [
+                CreateZipDownloadItems(
+                    id=e_id,
+                    type=(
+                        CreateZipDownloadItemsTypeField.FILE
+                        if e_type == "file"
+                        else CreateZipDownloadItemsTypeField.FOLDER
+                    ),
+                )
+                for (e_id, e_type) in entry_id
+            ]
 
-            while True:
-                chunk = box_stream.read(chunk_size)
+            b = os.path.basename(dl_to_path)
+            zip_name, _ = os.path.splitext(b)
 
-                if not chunk:
-                    break
+            zip_session = client.zip_downloads.create_zip_download(
+                items=items, download_file_name=zip_name
+            )
 
-                local_file.write(chunk)
+            if zip_session.download_url:
+                box_stream = client.zip_downloads.get_zip_download_content(
+                    zip_session.download_url
+                )
+            else:
+                raise Exception("Failed to create zip file for download.")
+
+        if box_stream:
+            with open(dl_to_path, "wb") as local_file:
+                chunk_size = 65536
+
+                while True:
+                    chunk = box_stream.read(chunk_size)
+
+                    if not chunk:
+                        break
+
+                    local_file.write(chunk)
+        else:
+            raise Exception("Failed due to Box API issue.")
 
         display_message("INFO", "Download complete.")
         display_path_desc(dl_to_path, "file")
         return True
 
     except Exception as e:
-        display_message("ERROR", f"Failed to download file (ID : {entry_id})", f"{e}")
+        display_message("ERROR", "Failed to download file.", f"{e}")
         return False
 
 

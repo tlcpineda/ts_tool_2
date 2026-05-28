@@ -20,6 +20,7 @@ from box_lib import (
     rename_box_entry,
 )
 from lib import (
+    LogManager,
     display_message,
     display_path_desc,
     expand_path,
@@ -359,6 +360,54 @@ def fetch_client_cr() -> None:
 
         return id_range
 
+    def purge_xlsx(xlsx_path: str, tab_name: str, work_id: str):
+        """
+        Open a local Excel file natively through Windows COM.
+        Keep first two tabs and the project tab,
+        and delete all other tabs.
+        """
+        excel_app = win32.Dispatch("Excel.Application")
+        excel_app.Visible = False
+        excel_app.DisplayAlerts = False
+
+        display_message("INFO", "Purging Client CR file ... ")
+        _, base = display_path_desc(xlsx_path, "file")
+
+        try:
+            workbook = excel_app.Workbooks.Open(
+                Filename=xlsx_path, CorruptLoad=win32.constants.xlRepairFile
+            )
+
+            # Delete the unnecessary tabs. Loop backwards; prevents index shift.
+            for i in range(len(workbook.Sheets), 2, -1):
+                sheet = workbook.Sheets(i)
+                sheetname = sheet.Name
+
+                if sheetname == tab_name:
+                    display_message(
+                        "INFO", f"Project sheet encountered ( {sheetname} )."
+                    )
+                    sheet.Name = f"{work_id}. {sheetname}"
+                    display_message("INFO", "Sheet renamed.")
+                else:
+                    display_message("INFO", f"Deleting sheet : {sheetname} ... ")
+                    sheet.Delete()
+                    # shell.SendKeys("{ENTER}")
+                    display_message("SUCCESS", "Sheet deleted.")
+
+            # Save the changes back to the original file.
+            workbook.SaveAs(Filename=xlsx_path)
+            workbook.Close()
+            display_message("SUCCESS", f"Client CR file ( {base} ) purged.")
+
+        except Exception as e:
+            display_message(
+                "ERROR", f"Failed to purge client CR file ( {base} ).", f"{e}"
+            )
+
+        finally:
+            excel_app.Quit()
+
     try:
         client = init_client()
 
@@ -441,7 +490,7 @@ def fetch_tl() -> None:
 
         # Loop through user-specified chapters to get matching translation document.
         for ch in chapters:
-            display_message("INFO", f"Select appropriate file for {ch} ... ")
+            display_message("INFO", f"File Selection for {ch} ... ")
 
             show_table(
                 f"{term}-{proj_code} Reviewed Translations",
@@ -508,49 +557,56 @@ def fetch_tl() -> None:
         return None
 
 
-def purge_xlsx(xlsx_path: str, tab_name: str, work_id: str):
-    """
-    Open a local Excel file natively through Windows COM.
-    Keep first two tabs and the project tab,
-    and delete all other tabs.
-    """
-    excel_app = win32.Dispatch("Excel.Application")
-    excel_app.Visible = False
-    excel_app.DisplayAlerts = False
+def fetch_data_files() -> None:
+    def get_source_url(cache: LogManager, work_id: str) -> tuple[str, str]:
+        url_jpeg = ""
+        url_psd = ""
+        projects = cache.load()
+        req_proj = [proj for proj in projects if proj["work_id"] == work_id]
 
-    display_message("INFO", "Purging Client CR file ... ")
-    _, base = display_path_desc(xlsx_path, "file")
+        if req_proj:
+            url_jpeg = req_proj[0]["source_url_jpeg"]
+            url_psd = req_proj[0]["source_url_psd"]
+
+        return url_jpeg, url_psd
 
     try:
-        workbook = excel_app.Workbooks.Open(
-            Filename=xlsx_path, CorruptLoad=win32.constants.xlRepairFile
-        )
+        cache = load_proj_cache(PROJ_CACHE)
+        work_id, proj_name, _, vol_num, _, _ = get_term_details(cache)
+        url_j, url_p = get_source_url(cache, work_id)
 
-        # Delete the unnecessary tabs. Loop backwards; prevents index shift.
-        for i in range(len(workbook.Sheets), 2, -1):
-            sheet = workbook.Sheets(i)
-            sheetname = sheet.Name
+        client = init_client()
 
-            if sheetname == tab_name:
-                display_message("INFO", f"Project sheet encountered ( {sheetname} ).")
-                sheet.Name = f"{work_id}. {sheetname}"
-                display_message("INFO", "Sheet renamed.")
+        if not client:
+            raise Exception("Failed to create Box client.")
+
+        for ext in ["PSD", "JPEG"]:
+            url = url_j if ext == "JPEG" else url_p
+
+            print(
+                f"\n<=> Get source folder ({ext}) URL for {proj_name} V{vol_num} starting at : "
+            )
+            print(f"\n      {url}")
+            input("\n>>> Press ENTER to continue ... ")
+            source_url = input(f"\n>>> Input source URL for {ext} files : ").strip()
+
+            zip_dest_path = parse_pathname(
+                os.path.join(PARENT_LOCAL, proj_name),
+                f"{work_id} - {int(vol_num)} {ext}",
+                "zip",
+                "file",
+            )
+
+            e_type, e_id = extract_entry_meta(source_url)
+            dl_stat = dl_box_entry(client, [(e_id, e_type)], zip_dest_path)
+
+            if dl_stat:
+                display_message("SUCCESS", f"Source {ext} files downloaded.")
             else:
-                display_message("INFO", f"Deleting sheet : {sheetname} ... ")
-                sheet.Delete()
-                # shell.SendKeys("{ENTER}")
-                display_message("SUCCESS", "Sheet deleted.")
-
-        # Save the changes back to the original file.
-        workbook.SaveAs(Filename=xlsx_path)
-        workbook.Close()
-        display_message("SUCCESS", f"Client CR file ( {base} ) purged.")
+                raise Exception("Failed to download file.")
 
     except Exception as e:
-        display_message("ERROR", f"Failed to purge client CR file ( {base} ).", f"{e}")
-
-    finally:
-        excel_app.Quit()
+        display_message("ERROR", "Failed to fetch typesetting data from Box.", f"{e}")
 
 
 if __name__ == "__main__":
@@ -572,13 +628,16 @@ if __name__ == "__main__":
                 "\n>>>  [M]ove PDF files to term folder ?"
                 "\n>>>  F[E]tch revision file/tab ?"
                 "\n>>>  Fetc[H] translation file/s ?"
+                "\n>>>  [D]ownload source files ?"
                 "\n>>>  Copy [T]ypesetting files to Revisions folder ?"
                 "\n>>>  E[X]it and close this window ?"
             )
 
             resp = input(">>> ").upper()
 
-            proper_resp = True if resp in ["B", "C", "M", "X"] else False
+            proper_resp = (
+                True if resp in ["B", "C", "D", "E", "H", "M", "T", "X"] else False
+            )
 
         if resp == "X":
             print("\n<=> Closing down ...")
@@ -601,3 +660,9 @@ if __name__ == "__main__":
 
             elif resp == "E":
                 fetch_client_cr()
+
+            elif resp == "H":
+                fetch_tl()
+
+            elif resp == "D":
+                fetch_data_files()
