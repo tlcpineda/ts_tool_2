@@ -288,7 +288,6 @@ def dl_box_entry(client: BoxClient, entry_id: str, dl_to_path: str) -> bool:
     """
     try:
         box_stream = client.downloads.download_file(entry_id)
-        # display_message("INFO", f"Downloading file (ID : {entry_id}) ... ")
 
         if not box_stream:
             raise Exception("Box API issue client.downloads.download_file().")

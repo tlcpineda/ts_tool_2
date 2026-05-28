@@ -43,6 +43,7 @@ lang_iso_2 = "en"
 load_dotenv()
 PROJ_CACHE = expand_path(os.getenv("PROJ_CACHE", ""))
 TS_PARENT = os.getenv("TS_PARENT", "")
+TL_REVIEWED = os.getenv("TL_REVIEWED", "")
 CR_PARENT = os.getenv("CR_PARENT", "")
 CR_FEEDBACK = os.getenv("CR_FEEDBACK", "")
 PARENT_LOCAL = expand_path(os.getenv("PARENT_LOCAL", ""))
@@ -363,7 +364,7 @@ def fetch_client_cr() -> None:
 
         # Terminate process if BoxClient is not created.
         if not client:
-            return None
+            raise Exception("Failed to create Box client.")
 
         proj_cache = load_proj_cache(PROJ_CACHE)
         proj_det = get_cached_proj_details(proj_cache)
@@ -405,6 +406,106 @@ def fetch_client_cr() -> None:
 
     except Exception as e:
         display_message("ERROR", "Failed to fetch CR file.", f"{e}")
+
+
+def fetch_tl() -> None:
+    try:
+        client = init_client()
+
+        if not client:
+            raise Exception("Failed to create Box client.")
+
+        cache = load_proj_cache(PROJ_CACHE)
+        _, proj_name, _, vol_num, term, chapters = get_term_details(cache)
+        proj_code, _ = proj_name.split(" ")
+        source_parent = TL_REVIEWED
+
+        # Search Box parent folder containing translation documents.
+        for folder_name in [term, proj_code]:
+            if isinstance(folder_name, str):
+                source = find_box_entry_by_name(
+                    client, source_parent, "folder", folder_name
+                )
+
+                if source:  # source becomes source_parent.
+                    source_parent = parse_box_url("folder", source.id)
+                else:
+                    raise Exception("Failed to trace parentage.")
+
+        tl_docs = get_box_entries(client, source_parent)
+
+        if not tl_docs:
+            raise Exception(f"Failed to list translation documents for {term}.")
+
+        dl_info = {}
+
+        # Loop through user-specified chapters to get matching translation document.
+        for ch in chapters:
+            display_message("INFO", f"Select appropriate file for {ch} ... ")
+
+            show_table(
+                f"{term}-{proj_code} Reviewed Translations",
+                [3, 13, 50],
+                ["DOC", "Box ID", "Filename"],
+                [[i + 1, doc.id, doc.name] for i, doc in enumerate(tl_docs)],
+            )
+
+            # Select file to download by "DOC" number.
+            resp = False
+            doc_num = 0
+            tl_id = ""
+            tl_bname = ""
+            tl_extname = ""
+
+            while not resp:
+                doc_num = int(
+                    input(
+                        f'\n>>> Enter "DOC" number for {ch} ("0" to skip chapter): '
+                    ).strip()
+                )
+
+                if doc_num in range(1, len(tl_docs) + 1):
+                    resp = True
+                elif doc_num == 0:
+                    display_message("WARN", f"Skip {ch}.")
+                    resp = True
+                else:
+                    display_message("WARN", f'"{doc_num}" is not a valid input.')
+
+            if doc_num:
+                # Pick entry ID based on DOC number; index of tl_docs.
+                tl_file = tl_docs[int(doc_num) - 1]
+                tl_id = tl_file.id
+                tl_bname, tl_extname = os.path.splitext(tl_file.name or "")
+                entry_url = parse_box_url("file", tl_id)
+
+                display_message("INFO", "Translation file selected for download.")
+                display_box_path(client, entry_url)
+
+                tl_dest_p = os.path.join(PARENT_LOCAL, proj_name, f"V{vol_num} - {ch}")
+                tl_dest = parse_pathname(tl_dest_p, tl_bname, tl_extname[1:], "file")
+
+                dl_info[ch] = {"box_id": tl_id, "dest_path": tl_dest}
+
+        for k, v in dl_info.items():
+            f_id = v["box_id"]
+            f_dest = v["dest_path"]
+
+            display_message("INFO", f"Downloading Box file (ID : {f_id}) ... ")
+            display_path_desc(f_dest, "file")
+
+            dl_stat = dl_box_entry(client, f_id, f_dest)
+
+            if dl_stat:
+                display_message("SUCCESS", "File successfully download.")
+            else:
+                raise Exception("Failed to download file.")
+
+        return None
+
+    except Exception as e:
+        display_message("ERROR", "Failed to fetch translation document.", f"{e}")
+        return None
 
 
 def purge_xlsx(xlsx_path: str, tab_name: str, work_id: str):
@@ -467,9 +568,10 @@ if __name__ == "__main__":
             print(
                 "\n>>> Select an option :"
                 "\n>>>  Rename [B]ox files (EN) ?"
-                "\n>>>  [M]ove PDF files to term folder ?"
                 "\n>>>  [C]reate typesetting term folder ?"
+                "\n>>>  [M]ove PDF files to term folder ?"
                 "\n>>>  F[E]tch revision file/tab ?"
+                "\n>>>  Fetc[H] translation file/s ?"
                 "\n>>>  Copy [T]ypesetting files to Revisions folder ?"
                 "\n>>>  E[X]it and close this window ?"
             )

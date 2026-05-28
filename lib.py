@@ -325,6 +325,9 @@ def copy_file(source_dir: str, dest_dir: str, filename: str, extname: str) -> No
 
 
 def parse_pathname(parent_dir: str, basename: str, extname: str, pathtype: str) -> str:
+    """
+    :param extname: Should not contain "." (dot) .
+    """
     if pathtype == "file":
         dest_path = os.path.join(parent_dir, f"{basename}.{extname}")
     else:  # folder
@@ -403,7 +406,10 @@ def parse_chapters(ch_in: str) -> list[str] | None:
     return sorted(list(set(ch_list)))
 
 
-def get_cached_proj_details(cache: LogManager) -> dict:
+def get_cached_proj_details(cache: LogManager) -> dict[str, str]:
+    """
+    :return: keys : "created", "work_id", "lit_id", "title_jp", "title_en"
+    """
     proj_det = {}
     work_id = ""
     resp = False
@@ -411,6 +417,7 @@ def get_cached_proj_details(cache: LogManager) -> dict:
     work_ids = [proj["work_id"] for proj in projects]
 
     show_proj_in_cache(projects)
+
     while not resp:
         work_id = input(
             '\n>>> Enter "Work ID" to select project (or "0" for a new project) : '
@@ -428,7 +435,6 @@ def get_cached_proj_details(cache: LogManager) -> dict:
         display_message("INFO", "Project selected from cache.")
 
     else:  # work_id == 0; input new project details.
-        # TODO loop system to be able to edit input if needed.
         proj_det = get_proj_details()  # Get details as user input.
         work_id = proj_det["work_id"]
         cache.add(proj_det)
