@@ -342,7 +342,12 @@ def show_proj_in_cache(cache: list) -> None:
 
     table_title = "PROJECT CACHE DATA"
     table = [
-        [row["work_id"], row["lit_id"], row["title_en"], row["title_jp"]]
+        [
+            row["work_id"],
+            row["lit_id"],
+            row["title_en"],
+            row["title_jp"],
+        ]
         for row in cache
     ]
 
@@ -517,6 +522,8 @@ def get_proj_details():
         "lit_id": "",
         "title_jp": "",
         "title_en": "",
+        "source_url_psd": "",
+        "source_url_jpeg": "",
     }
 
     print("\n>>> Add new project details ... ")
