@@ -12,14 +12,16 @@ from mod_04 import (
     copy_ts_files,
     create_term_tree,
     fetch_client_cr,
+    fetch_data_files,
+    fetch_tl,
     move_pdf,
     prefix_lang_code,
 )
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "5.00.00"
-date = "27 May 2026"
+app_ver = "5.01.00"
+date = "29 May 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
     {
@@ -66,6 +68,16 @@ options = [
         "menu": "F[E]tch revision file/tab",
         "shortkey": "E",
         "func": fetch_client_cr,
+    },
+    {
+        "menu": "Fetc[H] translation file/s",
+        "shortkey": "H",
+        "func": fetch_tl,
+    },
+    {
+        "menu": "[D]ownload source files",
+        "shortkey": "D",
+        "func": fetch_data_files,
     },
     {
         "menu": "Copy [T]ypesetting files to Revisions folder",
