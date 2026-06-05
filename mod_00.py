@@ -22,7 +22,6 @@ from lib import (
     welcome_sequence,
     write_to_csv,
 )
-from mod_04 import fetch_data_files
 
 # Module variables
 mod_name = "Preliminary Administrative Works"
@@ -150,7 +149,15 @@ def prepare_files() -> None:
                     ensure_path_exists(psd_dest_w, "folder")
                     w_psd_ch_folders.append(psd_dest_w)
 
-                psd_name_w = f"{'GTNP ' if gtn == '○' else ''}{lang_iso_2}_{title_vol}_{ch_4}_{int(page_num):03}"
+                # # Working PSD file renamed "en_[title_vol]_[ch_4]_[pg_num_3]
+                # psd_name_w = f"{'GTNP ' if gtn == '○' else ''}{lang_iso_2}_{title_vol}_{ch_4}_{int(page_num):03}"
+
+                # Working PSD file same file name as typesetting data file;
+                # with ordinal numbering by chapter affixed.
+                # allowing for "GO TO NEXT PAGE" prefix.
+                psd_name_w = (
+                    f"{'GTNP ' if gtn == '○' else ''}{psd_name} {int(page_num):03}"
+                )
 
                 copy_file(psd_files_dir, psd_dest_w, psd_name, "psd")
                 rename_path(
@@ -246,6 +253,9 @@ def verify_contents_ref_folder(
 
 
 def gen_pagination() -> tuple[list[list[str]], str, str, str]:
+    """
+    :return: csv_data, proj_name, vol_num, title_vol
+    """
     try:
         cache = load_proj_cache(PROJ_CACHE)
         work_id, proj_name, title_en, vol_num, _, _ = get_term_details(cache)

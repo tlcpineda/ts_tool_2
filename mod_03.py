@@ -12,6 +12,7 @@ from lib import (
     hor_bar,
     identify_path,
     parse_pathname,
+    rename_path,
     welcome_sequence,
 )
 
@@ -61,17 +62,27 @@ def compile_revision() -> None:
             s_parent, s_basename = display_path_desc(source_file, "file")
 
             s_basename = os.path.splitext(filename)[0]
+            # Remove ordinal page numbering, if exists.
+            bname = s_basename.split(" ")[0] if " " in s_basename else s_basename
 
             # Create matchng JPEG file.
             with Image.open(source_file) as img:
                 img_mode = "CMYK" if img.mode == "CMYK" else "RGB"
                 rgb_img = img.convert(img_mode)
-                jpeg_path = save_jpeg(rgb_img, jpeg_dir, s_basename)
+                jpeg_path = save_jpeg(rgb_img, jpeg_dir, bname)
 
                 # Append path of saved JPEG file, file PDF compilation.
                 for_pdf_pages.append(jpeg_path)
 
             copy_file(input_path, psd_dir, s_basename, "psd")
+
+            # Rename psd files if ordinal page numbering is affixed.
+            if s_basename != bname:
+                rename_path(
+                    parse_pathname(psd_dir, s_basename, "psd", "file"),
+                    parse_pathname(psd_dir, bname, "psd", "file"),
+                    "file",
+                )
 
             print("")
             hor_bar(100)
@@ -196,7 +207,7 @@ def filter_files(source_path: str) -> list:
     :return filtered_files: The list of filtered PSD files to be compiled
     """
     display_message("INFO", "Filtering files ...")
-    parent_folder, base_folder = display_path_desc(source_path, "folder")
+    display_path_desc(source_path, "folder")
 
     source_files = os.listdir(source_path)
 
@@ -206,9 +217,7 @@ def filter_files(source_path: str) -> list:
         for f in source_files:
             filename, extname = os.path.splitext(f)
 
-            if (
-                filename.startswith(base_folder) and extname.lower() == ".psd"
-            ):  # Append file to return list if page_marker exists.
+            if extname.lower() == ".psd":
                 filtered_files.append(f)
                 print(f"\n<=>  {f} -> INCLUDE")
             else:

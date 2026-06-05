@@ -27,11 +27,13 @@ from lib import (
     get_cached_proj_details,
     get_term_details,
     hor_bar,
+    load_csv,
     load_proj_cache,
     parse_pathname,
     show_table,
     welcome_sequence,
 )
+from mod_00 import parse_ch_name
 
 # Module variables
 mod_name = "Box API Operations"
@@ -161,6 +163,85 @@ def prefix_lang_code():
                 )
                 break
         break
+
+
+def revert_box_filenames():
+    """
+    Rename files in Box to names used by original cleaned files.
+    """
+    client = init_client()
+
+    if not client:
+        return
+
+    cache = load_proj_cache(PROJ_CACHE)
+    work_id, proj_name, title_en, vol_num, term, chapters = get_term_details(cache)
+
+    display_message("INFO", "Select pagination CSV ... ")
+    pagination_data, _ = load_csv()
+
+    pg_obj = {}
+
+    # Convert pagination_data to object {key = basename (no extension) "en_[proj_name]_[vol_num]_[ch_num]_[page_num]"}
+    # {data = ts_data}
+    for row in pagination_data[2:]:
+        _, vol, ts_data, _, ep_ch, pg_num, not_in, _ = row
+        if not_in == "—":
+            key_name = f"{lang_iso_2}_{title_en}_{int(vol):03}_{parse_ch_name(ep_ch)[1]}_{int(pg_num):03}"
+
+            pg_obj[key_name] = ts_data
+
+    parent_url = TS_PARENT
+    for branch_name in [term, proj_name, chapters]:
+        if isinstance(branch_name, str):
+            parent = find_box_entry_by_name(client, parent_url, "folder", branch_name)
+
+            if not parent:
+                continue
+
+            parent_url = parse_box_url("folder", parent.id)
+
+        elif isinstance(branch_name, list):
+            len_br = len(branch_name)
+            for ch_ind, chapter in enumerate(branch_name):
+                hor_bar(100, f"Processing {chapter} ( {ch_ind + 1} / {len_br} ) ... ")
+
+                ch = find_box_entry_by_name(client, parent_url, "folder", chapter)
+
+                if not ch:
+                    continue
+
+                ch_url = parse_box_url("folder", ch.id)
+
+                for b_name in ["JPEG", "PSD"]:
+                    branch = find_box_entry_by_name(client, ch_url, "folder", b_name)
+                    if not branch:
+                        continue
+
+                    branch_entries = get_box_entries(
+                        client, parse_box_url("folder", branch.id)
+                    )
+
+                    for entry in branch_entries:
+                        b_name, ext_name = os.path.splitext(entry.name or "")
+
+                        if b_name not in pg_obj.keys():
+                            display_message(
+                                "WARN",
+                                f"Skipping {entry.name}. Basename not found in pagination object.",
+                            )
+                            continue
+
+                        new_name = pg_obj[b_name] + ext_name
+
+                        rename_box_entry(
+                            client, parse_box_url("file", entry.id), new_name
+                        )
+
+                        box_delay(1)  # 1-sec delay per file
+
+                    box_delay(1)  # 1-sec delay between "JPEG" and "PSD" folders
+                box_delay(2)  # 2-sec delay between chapter folders
 
 
 def move_pdf():
@@ -624,6 +705,7 @@ if __name__ == "__main__":
             print(
                 "\n>>> Select an option :"
                 "\n>>>  Rename [B]ox files (EN) ?"
+                "\n>>>  Revert B[O]x filenames ?"
                 "\n>>>  [C]reate typesetting term folder ?"
                 "\n>>>  [M]ove PDF files to term folder ?"
                 "\n>>>  F[E]tch revision file/tab ?"
@@ -636,7 +718,7 @@ if __name__ == "__main__":
             resp = input(">>> ").upper()
 
             proper_resp = (
-                True if resp in ["B", "C", "D", "E", "H", "M", "T", "X"] else False
+                True if resp in ["B", "C", "D", "E", "H", "M", "O", "T", "X"] else False
             )
 
         if resp == "X":
@@ -666,3 +748,6 @@ if __name__ == "__main__":
 
             elif resp == "D":
                 fetch_data_files()
+
+            elif resp == "O":
+                revert_box_filenames()

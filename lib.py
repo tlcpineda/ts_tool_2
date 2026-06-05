@@ -246,7 +246,7 @@ def load_csv(inpath: str = "") -> tuple[list[list[str]], str]:
     data = []
 
     if not inpath:
-        print(">>> Select preliminary CSV file ...")
+        print(">>> Select CSV file ...")
 
         path = str(identify_path("csv"))
 

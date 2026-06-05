@@ -16,12 +16,13 @@ from mod_04 import (
     fetch_tl,
     move_pdf,
     prefix_lang_code,
+    revert_box_filenames,
 )
 
 # App variables
 app_name = "Typesetting Tools 2"
-app_ver = "5.01.00"
-date = "29 May 2026"
+app_ver = "5.02.00"
+date = "05 Jun 2026"
 email = "tlcpineda.projects@gmail.com"
 options = [
     {
@@ -53,6 +54,11 @@ options = [
         "menu": "Rename files in [B]ox",
         "shortkey": "B",
         "func": prefix_lang_code,
+    },
+    {
+        "menu": "Revert B[O]x filenames",
+        "shortkey": "O",
+        "func": revert_box_filenames,
     },
     {
         "menu": "[M]ove PDF files to term folder",
